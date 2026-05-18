@@ -5,12 +5,10 @@ import {
 } from 'discord.js';
 import { Command } from './types';
 import { CommandScopeService } from '../services/CommandScopeService';
-import { OwnershipService } from '../services/OwnershipService';
 import { RoomLifecycleService } from '../services/RoomLifecycleService';
-import { logger } from '../core/Logger';
+import { RoomActions } from '../services/RoomActions';
 
 const scopeService = new CommandScopeService();
-const ownershipService = new OwnershipService();
 
 export const takeOwnershipCommand: Command = {
   data: new SlashCommandBuilder()
@@ -29,56 +27,14 @@ export const takeOwnershipCommand: Command = {
       return;
     }
 
-    const member = interaction.member as GuildMember;
-    const currentChannelId = member.voice.channelId;
+    const lifecycleService = new RoomLifecycleService(interaction.client);
+    const roomActions = new RoomActions(lifecycleService);
 
-    if (!currentChannelId) {
-      await interaction.reply({ content: 'You must be in a managed room to take ownership.', ephemeral: true });
-      return;
-    }
+    const result = await roomActions.runClaim(interaction.member, interaction.guild);
 
-    const canTake = ownershipService.canTakeOwnership(member, currentChannelId);
-    if (!canTake.allowed) {
-      await interaction.reply({ content: canTake.reason, ephemeral: true });
-      return;
-    }
-
-    try {
-      const lifecycleService = new RoomLifecycleService(interaction.client);
-      const room = await import('../state/RoomStore').then(m => m.roomStore.get(currentChannelId));
-      if (!room) {
-        await interaction.reply({ content: 'Room not found.', ephemeral: true });
-        return;
-      }
-
-      const result = await lifecycleService.transferOwnership(
-        currentChannelId,
-        interaction.guild,
-        room.ownerUserId,
-        member.id,
-      );
-
-      if (!result.ok) {
-        await interaction.reply({
-          content: result.warning ?? 'Failed to transfer ownership.',
-          ephemeral: true,
-        });
-        return;
-      }
-
-      const voiceChannel = interaction.guild.channels.cache.get(currentChannelId);
-      const roomLabel = voiceChannel ? `<#${currentChannelId}>` : 'the room';
-
-      await interaction.reply({
-        content:
-          `✅ <@${member.id}> is now the owner of ${roomLabel}.` +
-          (result.warning ? `\n\n⚠️ ${result.warning}` : ''),
-        ephemeral: false,
-      });
-      logger.info(`User ${member.user.tag} took ownership of room ${currentChannelId}`);
-    } catch (error) {
-      logger.error('Failed to transfer ownership', error);
-      await interaction.reply({ content: 'Failed to transfer ownership. Please try again.', ephemeral: true });
-    }
+    await interaction.reply({
+      content: result.message || 'An error occurred.',
+      ephemeral: true,
+    });
   },
 };

@@ -8,6 +8,11 @@ export interface GuildConfig {
   rolePresets: Record<string, string[]>;
   createdAt: number;
   updatedAt: number;
+  roomControlUi?: {
+    enabled: boolean;
+    panelChannelId: string;
+    panelMessageId: string;
+  };
 }
 
 export interface ManagedRoom {

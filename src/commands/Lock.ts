@@ -1,17 +1,14 @@
 import {
   SlashCommandBuilder,
   ChatInputCommandInteraction,
+  GuildMember,
 } from 'discord.js';
 import { Command } from './types';
 import { CommandScopeService } from '../services/CommandScopeService';
-import { OwnershipService } from '../services/OwnershipService';
 import { RoomLifecycleService } from '../services/RoomLifecycleService';
-import { configStore } from '../state/ConfigStore';
-import { roomStore } from '../state/RoomStore';
-import { logger } from '../core/Logger';
+import { RoomActions } from '../services/RoomActions';
 
 const scopeService = new CommandScopeService();
-const ownershipService = new OwnershipService();
 
 export const lockCommand: Command = {
   data: new SlashCommandBuilder()
@@ -19,7 +16,7 @@ export const lockCommand: Command = {
     .setDescription('Lock your managed room (prevent new users from joining)'),
 
   async execute(interaction: ChatInputCommandInteraction) {
-    if (!interaction.guildId || !interaction.guild) {
+    if (!interaction.guildId || !interaction.guild || !(interaction.member instanceof GuildMember)) {
       await interaction.reply({ content: 'This command can only be used in a server.', ephemeral: true });
       return;
     }
@@ -30,48 +27,14 @@ export const lockCommand: Command = {
       return;
     }
 
-    const roomChannelId = ownershipService.getOwnerRoom(interaction.user.id);
-    if (!roomChannelId) {
-      await interaction.reply({ content: "You don't own a managed room.", ephemeral: true });
-      return;
-    }
+    const lifecycleService = new RoomLifecycleService(interaction.client);
+    const roomActions = new RoomActions(lifecycleService);
 
-    const room = roomStore.get(roomChannelId);
-    if (!room) {
-      await interaction.reply({ content: 'Room not found.', ephemeral: true });
-      return;
-    }
+    const result = await roomActions.runLock(interaction.member, interaction.guild);
 
-    if (room.locked) {
-      await interaction.reply({ content: 'Your room is already locked.', ephemeral: true });
-      return;
-    }
-
-    const config = configStore.get(interaction.guildId);
-    if (!config) {
-      await interaction.reply({ content: 'Bot configuration not found.', ephemeral: true });
-      return;
-    }
-
-    try {
-      const lifecycleService = new RoomLifecycleService(interaction.client);
-      await lifecycleService.lockRoom(roomChannelId, interaction.guild, config, room.rolePresetUsed);
-
-      const deniedRoles = [config.baseRoleId ? `<@&${config.baseRoleId}>` : '@everyone'];
-      if (room.rolePresetUsed && config.rolePresets[room.rolePresetUsed]) {
-        config.rolePresets[room.rolePresetUsed].forEach((roleId) => {
-          deniedRoles.push(`<@&${roleId}>`);
-        });
-      }
-
-      await interaction.reply({
-        content: `🔒 Room locked. Denied access to: ${deniedRoles.join(', ')}`,
-        ephemeral: false,
-      });
-      logger.info(`User ${interaction.user.tag} locked room ${roomChannelId}`);
-    } catch (error) {
-      logger.error('Failed to lock room', error);
-      await interaction.reply({ content: 'Failed to lock room. Please try again.', ephemeral: true });
-    }
+    await interaction.reply({
+      content: result.message || 'An error occurred.',
+      ephemeral: true,
+    });
   },
 };

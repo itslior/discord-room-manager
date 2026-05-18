@@ -8,6 +8,7 @@ import { lockCommand } from '../commands/Lock';
 import { unlockCommand } from '../commands/Unlock';
 import { takeOwnershipCommand } from '../commands/TakeOwnership';
 import { transferCommand } from '../commands/Transfer';
+import { setRoomControlUiCommand } from '../commands/SetRoomControlUi';
 
 const commands = [
   setupCommand,
@@ -16,6 +17,7 @@ const commands = [
   unlockCommand,
   takeOwnershipCommand,
   transferCommand,
+  setRoomControlUiCommand,
 ].map((cmd) => cmd.data.toJSON());
 
 const rest = new REST().setToken(env.discordBotToken);

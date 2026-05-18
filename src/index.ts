@@ -9,6 +9,7 @@ import { lockCommand } from './commands/Lock';
 import { unlockCommand } from './commands/Unlock';
 import { takeOwnershipCommand } from './commands/TakeOwnership';
 import { transferCommand } from './commands/Transfer';
+import { setRoomControlUiCommand } from './commands/SetRoomControlUi';
 
 async function main() {
   logger.info('Starting Discord Room Manager Bot...');
@@ -21,6 +22,7 @@ async function main() {
   bot.registerCommand(unlockCommand);
   bot.registerCommand(takeOwnershipCommand);
   bot.registerCommand(transferCommand);
+  bot.registerCommand(setRoomControlUiCommand);
 
   registerVoiceStateUpdate(bot.client);
   registerInteractionCreate(bot);

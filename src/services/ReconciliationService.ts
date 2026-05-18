@@ -1,4 +1,10 @@
-import { Client, ChannelType, PermissionFlagsBits } from 'discord.js';
+import {
+  Client,
+  ChannelType,
+  Guild,
+  PermissionFlagsBits,
+  VoiceChannel,
+} from 'discord.js';
 import { roomStore } from '../state/RoomStore';
 import { configStore } from '../state/ConfigStore';
 import { logger } from '../core/Logger';
@@ -35,7 +41,7 @@ export class ReconciliationService {
       if (!config) return { preserved, cleaned, orphaned };
 
       const trackedRooms = roomStore.getByGuild(guildId);
-      const managedChannels = this.findManagedChannels(guild, config.namePrefix);
+      const deletedChannelIds = new Set<string>();
 
       for (const room of trackedRooms) {
         const channel = guild.channels.cache.get(room.channelId);
@@ -44,29 +50,34 @@ export class ReconciliationService {
           orphaned++;
           logger.debug(`Removed orphaned room tracking: ${room.channelId}`);
         } else if (channel.type === ChannelType.GuildVoice && channel.members.size === 0) {
-          try {
-            await channel.delete('Empty room cleanup on reconciliation');
+          const deleted = await this.safeDeleteChannel(channel, 'Empty room cleanup on reconciliation');
+          deletedChannelIds.add(room.channelId);
+          if (deleted) {
             await roomStore.delete(room.channelId);
             cleaned++;
             logger.debug(`Cleaned empty room: ${channel.name}`);
-          } catch (error) {
-            logger.error(`Failed to clean room ${channel.name}`, error);
+          } else {
+            await roomStore.delete(room.channelId);
+            orphaned++;
           }
         } else {
           preserved++;
         }
       }
 
+      const managedChannels = this.findManagedChannels(guild, config.namePrefix);
+
       for (const channel of managedChannels) {
-        if (!roomStore.has(channel.id)) {
-          if (channel.members.size === 0) {
-            try {
-              await channel.delete('Untracked empty managed room cleanup');
-              cleaned++;
-              logger.debug(`Cleaned untracked empty room: ${channel.name}`);
-            } catch (error) {
-              logger.error(`Failed to clean untracked room ${channel.name}`, error);
-            }
+        if (deletedChannelIds.has(channel.id)) continue;
+        if (!guild.channels.cache.has(channel.id)) continue;
+        if (!roomStore.has(channel.id) && channel.members.size === 0) {
+          const deleted = await this.safeDeleteChannel(
+            channel,
+            'Untracked empty managed room cleanup',
+          );
+          if (deleted) {
+            cleaned++;
+            logger.debug(`Cleaned untracked empty room: ${channel.name}`);
           }
         }
       }
@@ -77,20 +88,61 @@ export class ReconciliationService {
     return { preserved, cleaned, orphaned };
   }
 
-  private findManagedChannels(guild: any, prefix: string) {
+  private findManagedChannels(guild: Guild, prefix: string): VoiceChannel[] {
     const pattern = new RegExp(`^${prefix}\\d+$`);
-    const managedChannels = [];
+    const managedChannels: VoiceChannel[] = [];
 
     for (const channel of guild.channels.cache.values()) {
       if (channel.type !== ChannelType.GuildVoice) continue;
       if (!pattern.test(channel.name)) continue;
 
       const botOverwrite = channel.permissionOverwrites.cache.get(this.client.user!.id);
-      if (botOverwrite?.allow.has(PermissionFlagsBits.ManageChannels)) {
-        managedChannels.push(channel);
-      }
+      if (!botOverwrite?.allow.has(PermissionFlagsBits.ManageChannels)) continue;
+      if (!this.canBotDeleteChannel(guild, channel)) continue;
+
+      managedChannels.push(channel);
     }
 
     return managedChannels;
+  }
+
+  private canBotDeleteChannel(guild: Guild, channel: VoiceChannel): boolean {
+    const me = guild.members.me;
+    if (!me) return false;
+
+    const perms = channel.permissionsFor(me);
+    if (!perms) return false;
+
+    return perms.has(PermissionFlagsBits.ViewChannel) &&
+      perms.has(PermissionFlagsBits.ManageChannels);
+  }
+
+  private async safeDeleteChannel(channel: VoiceChannel, reason: string): Promise<boolean> {
+    const guild = channel.guild;
+    if (!this.canBotDeleteChannel(guild, channel)) {
+      logger.warn(
+        `Skipping delete for #${channel.name}: bot cannot view or manage this channel (check category permissions).`,
+      );
+      return false;
+    }
+
+    try {
+      await channel.delete(reason);
+      return true;
+    } catch (error) {
+      const code = (error as { code?: number }).code;
+      if (code === 10003) {
+        logger.debug(`#${channel.name} was already deleted`);
+        return true;
+      }
+      if (code === 50001 || code === 50013) {
+        logger.warn(
+          `Could not delete #${channel.name}: missing access or permissions (Discord error ${code}).`,
+        );
+        return false;
+      }
+      logger.error(`Failed to delete #${channel.name}`, error);
+      return false;
+    }
   }
 }

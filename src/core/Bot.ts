@@ -41,6 +41,20 @@ export class Bot {
         const { ReconciliationService } = await import('../services/ReconciliationService');
         const reconciliationService = new ReconciliationService(this.client);
         await reconciliationService.reconcileAll();
+
+        const { RoomControlCommandService } = await import('../services/RoomControlCommandService');
+        const contextMenuService = new RoomControlCommandService();
+        
+        for (const config of configStore.getAll()) {
+          if (config.roomControlUi?.enabled) {
+            try {
+              await contextMenuService.registerGuildContextMenus(config.guildId);
+              logger.info(`Registered context menus for guild ${config.guildId} on startup`);
+            } catch (error) {
+              logger.error(`Failed to register context menus for guild ${config.guildId} on startup`, error);
+            }
+          }
+        }
       });
 
       this.client.on(Events.Error, (error) => {

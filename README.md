@@ -7,8 +7,10 @@ A production-ready Discord bot that automatically creates temporary voice channe
 - **Auto Room Creation**: Users joining a configured lobby voice channel automatically get their own temporary room
 - **Smart Naming**: Rooms use lowest available index (VC1, VC2, etc.) with automatic gap filling
 - **Role-Based Access**: Configure role presets to restrict who can create rooms
-- **Room Ownership**: Channel creators get elevated permissions and command access
+- **Room Ownership**: Channel creators tracked by bot for command access
+- **Room Control UI**: Optional button panel and context menus for room management
 - **Lock/Unlock**: Owners can lock rooms to prevent new users from joining
+- **Kick/Ban**: Owners can kick users or ban them from reconnecting
 - **Ownership Transfer**: Transfer or take ownership when original owner leaves
 - **Auto Cleanup**: Empty rooms are automatically deleted
 - **Crash Recovery**: Bot identifies and cleans orphaned rooms on restart using permission markers
@@ -124,33 +126,60 @@ Example: Allow only Diamond, Master, Champion, and Grandmaster roles to create r
 1. Get role IDs (enable Developer Mode, right-click role, Copy ID)
 2. Run: `/config set-roles preset_name:diamond+ role_ids:DIAMOND_ID,MASTER_ID,CHAMPION_ID,GRANDMASTER_ID`
 
-## User Commands
+## Room Control
 
-All room control commands must be run in the configured command channel.
+### Setting Up the UI (Admin Only)
+
+After running `/setup`, enable the room control panel:
+
+```
+/set-room-control-ui
+```
+
+This posts a **static control panel** in your command channel with buttons for:
+- 🔒 Lock / 🔓 Unlock
+- 👢 Kick / 🚫 Ban / ✅ Unban
+- 👑 Claim / 🤝 Pass Ownership
+- ℹ️ Status
+
+All button actions are **ephemeral** (only you see the result). The panel message stays clean.
+
+**Context Menus**: Right-click a user → Apps → Kick/Ban/Unban/Pass Ownership
+
+### User Commands (Slash)
+
+All room control commands must be run in the configured command channel. Owners must be **in their voice room** to use controls.
 
 ### `/lock`
 Lock your managed room (prevents new users from joining).
-- Must be room owner
+- Must be room owner and in your room
 - Denies configured base role + any role preset roles used during creation
-- Example response: `🔒 Room locked. Denied access to: @everyone, @Diamond, @Master`
 
 ### `/unlock`
 Unlock your managed room.
-- Must be room owner
-- Restores access to base role + preset roles
-- Example response: `🔓 Room unlocked. Restored access to: @everyone, @Diamond, @Master`
+- Must be room owner and in your room
 
 ### `/take-ownership`
 Take ownership of a room when the original owner has left.
 - Must be in the room
 - Original owner must **not** be connected
-- Transfers all owner permissions
 
 ### `/transfer @user`
 Explicitly transfer ownership to another user.
-- Must be current room owner
+- Must be current room owner and in your room
 - Target user must be in your room
-- Example: `/transfer @Alice`
+
+### Kick, Ban, Unban
+
+Via UI buttons or context menus (owner must be in room):
+
+- **Kick**: Disconnect a user from your room
+- **Ban**: Deny a specific user from reconnecting (permission overwrite, not a server ban)
+- **Unban**: Remove the connection deny for a specific user
+
+### Status
+
+View room info: owner, locked state, current members, banned users
 
 ## How It Works
 
@@ -158,10 +187,9 @@ Explicitly transfer ownership to another user.
 1. User with eligible roles joins the configured lobby
 2. Bot finds lowest available room index (e.g., `VC1`, `VC2`, or fills gaps)
 3. Bot creates voice channel with:
-   - Bot's `MANAGE_CHANNELS` permission overwrite (for tracking)
-   - Owner's elevated permissions (ManageChannels, MoveMembers, etc.)
+   - Bot's `MANAGE_CHANNELS` permission overwrite (for tracking and cleanup)
 4. User is automatically moved to new room
-5. Room metadata is persisted to disk
+5. Room ownership tracked in bot state (no voice channel permission overwrites for owners)
 
 ### Room Cleanup Flow
 1. Last user leaves a managed room (owner or not)

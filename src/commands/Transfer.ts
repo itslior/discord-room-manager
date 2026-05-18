@@ -5,12 +5,10 @@ import {
 } from 'discord.js';
 import { Command } from './types';
 import { CommandScopeService } from '../services/CommandScopeService';
-import { OwnershipService } from '../services/OwnershipService';
 import { RoomLifecycleService } from '../services/RoomLifecycleService';
-import { logger } from '../core/Logger';
+import { RoomActions } from '../services/RoomActions';
 
 const scopeService = new CommandScopeService();
-const ownershipService = new OwnershipService();
 
 export const transferCommand: Command = {
   data: new SlashCommandBuilder()
@@ -36,54 +34,15 @@ export const transferCommand: Command = {
     }
 
     const targetUser = interaction.options.getUser('user', true);
-    const targetMember = interaction.guild.members.cache.get(targetUser.id);
 
-    if (!targetMember) {
-      await interaction.reply({ content: 'Target user not found in this server.', ephemeral: true });
-      return;
-    }
+    const lifecycleService = new RoomLifecycleService(interaction.client);
+    const roomActions = new RoomActions(lifecycleService);
 
-    const roomChannelId = ownershipService.getOwnerRoom(interaction.user.id);
-    if (!roomChannelId) {
-      await interaction.reply({ content: "You don't own a managed room.", ephemeral: true });
-      return;
-    }
+    const result = await roomActions.runPassOwnership(interaction.member, interaction.guild, targetUser.id);
 
-    const canTransfer = ownershipService.canTransfer(interaction.user.id, targetMember, roomChannelId);
-    if (!canTransfer.allowed) {
-      await interaction.reply({ content: canTransfer.reason, ephemeral: true });
-      return;
-    }
-
-    try {
-      const lifecycleService = new RoomLifecycleService(interaction.client);
-      const result = await lifecycleService.transferOwnership(
-        roomChannelId,
-        interaction.guild,
-        interaction.user.id,
-        targetMember.id,
-      );
-
-      if (!result.ok) {
-        await interaction.reply({
-          content: result.warning ?? 'Failed to transfer ownership.',
-          ephemeral: true,
-        });
-        return;
-      }
-
-      const roomLabel = `<#${roomChannelId}>`;
-
-      await interaction.reply({
-        content:
-          `✅ Ownership of ${roomLabel} transferred from <@${interaction.user.id}> to <@${targetMember.id}>.` +
-          (result.warning ? `\n\n⚠️ ${result.warning}` : ''),
-        ephemeral: false,
-      });
-      logger.info(`User ${interaction.user.tag} transferred ownership to ${targetMember.user.tag}`);
-    } catch (error) {
-      logger.error('Failed to transfer ownership', error);
-      await interaction.reply({ content: 'Failed to transfer ownership. Please try again.', ephemeral: true });
-    }
+    await interaction.reply({
+      content: result.message || 'An error occurred.',
+      ephemeral: true,
+    });
   },
 };
