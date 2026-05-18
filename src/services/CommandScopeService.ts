@@ -6,7 +6,7 @@ export class CommandScopeService {
     const config = configStore.get(interaction.guildId!);
     
     if (!config) {
-      return { allowed: false, reason: 'Bot is not configured for this server. Run `/setup` first.' };
+      return { allowed: false, reason: 'Bot is not configured for this server. Run `/config set-command-channel` first.' };
     }
 
     if (interaction.channelId !== config.commandChannelId) {

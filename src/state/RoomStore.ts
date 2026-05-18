@@ -7,10 +7,14 @@ class RoomStore {
   private readonly filename = 'rooms.json';
 
   async load(): Promise<void> {
-    const data = await persistence.read<Record<string, ManagedRoom>>(this.filename);
+    const data = await persistence.read<Record<string, any>>(this.filename);
     if (data) {
       Object.entries(data).forEach(([channelId, room]) => {
-        this.rooms.set(channelId, room);
+        if (!room.hubId) {
+          room.hubId = 'legacy-lobby';
+          logger.debug(`Migrated room ${channelId} to use legacy-lobby hub`);
+        }
+        this.rooms.set(channelId, room as ManagedRoom);
       });
       logger.info(`Loaded ${this.rooms.size} managed rooms`);
     }

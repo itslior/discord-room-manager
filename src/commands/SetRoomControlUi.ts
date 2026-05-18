@@ -35,7 +35,7 @@ export const setRoomControlUiCommand: Command = {
 
     const config = configStore.get(interaction.guildId);
     if (!config) {
-      await interaction.reply({ content: 'Bot is not configured. Run `/setup` first.', ephemeral: true });
+      await interaction.reply({ content: 'Bot is not configured. Run `/config set-command-channel` first.', ephemeral: true });
       return;
     }
 

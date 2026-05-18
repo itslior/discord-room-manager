@@ -7,6 +7,7 @@ import {
 } from 'discord.js';
 import { Command } from './types';
 import { GuildConfigService } from '../services/GuildConfigService';
+import { VcHub } from '../types/domain';
 
 const configService = new GuildConfigService();
 
@@ -21,67 +22,122 @@ export const configCommand: Command = {
     )
     .addSubcommand((subcommand) =>
       subcommand
-        .setName('set-lobby')
-        .setDescription('Update lobby channel')
-        .addChannelOption((option) =>
-          option
-            .setName('channel')
-            .setDescription('New lobby channel')
-            .addChannelTypes(ChannelType.GuildVoice)
-            .setRequired(true),
-        ),
-    )
-    .addSubcommand((subcommand) =>
-      subcommand
         .setName('set-command-channel')
-        .setDescription('Update command channel')
+        .setDescription('Set command channel')
         .addChannelOption((option) =>
           option
             .setName('channel')
-            .setDescription('New command channel')
+            .setDescription('Command channel')
             .addChannelTypes(ChannelType.GuildText)
             .setRequired(true),
         ),
     )
     .addSubcommand((subcommand) =>
       subcommand
-        .setName('set-category')
-        .setDescription('Update target category')
+        .setName('add-vc-room')
+        .setDescription('Add a new VC hub')
         .addChannelOption((option) =>
           option
-            .setName('category')
-            .setDescription('Category for managed rooms')
-            .addChannelTypes(ChannelType.GuildCategory)
+            .setName('lobby_channel')
+            .setDescription('Voice channel to use as lobby')
+            .addChannelTypes(ChannelType.GuildVoice)
             .setRequired(true),
-        ),
-    )
-    .addSubcommand((subcommand) =>
-      subcommand
-        .setName('set-base-role')
-        .setDescription('Set base role for lock/unlock (default: @everyone)')
+        )
         .addRoleOption((option) =>
           option
-            .setName('role')
-            .setDescription('Base role for permissions')
+            .setName('role1')
+            .setDescription('Role allowed to connect')
             .setRequired(true),
-        ),
-    )
-    .addSubcommand((subcommand) =>
-      subcommand
-        .setName('set-roles')
-        .setDescription('Configure role preset for lobby access')
-        .addStringOption((option) =>
+        )
+        .addRoleOption((option) =>
           option
-            .setName('preset_name')
-            .setDescription('Name of the preset (e.g., diamond+)')
-            .setRequired(true),
+            .setName('role2')
+            .setDescription('Additional role allowed to connect')
+            .setRequired(false),
+        )
+        .addRoleOption((option) =>
+          option
+            .setName('role3')
+            .setDescription('Additional role allowed to connect')
+            .setRequired(false),
+        )
+        .addRoleOption((option) =>
+          option
+            .setName('role4')
+            .setDescription('Additional role allowed to connect')
+            .setRequired(false),
+        )
+        .addRoleOption((option) =>
+          option
+            .setName('role5')
+            .setDescription('Additional role allowed to connect')
+            .setRequired(false),
         )
         .addStringOption((option) =>
           option
-            .setName('role_ids')
-            .setDescription('Comma-separated role IDs')
+            .setName('prefix')
+            .setDescription('Room name prefix (e.g., "General" → "General VC1", empty → "VC1")')
+            .setRequired(false),
+        ),
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName('remove-vc-room')
+        .setDescription('Remove a VC hub')
+        .addChannelOption((option) =>
+          option
+            .setName('lobby_channel')
+            .setDescription('The lobby voice channel of the hub to remove')
+            .addChannelTypes(ChannelType.GuildVoice)
             .setRequired(true),
         ),
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName('set-vc-room-forbid')
+        .setDescription('Set forbidden roles for a VC hub')
+        .addChannelOption((option) =>
+          option
+            .setName('lobby_channel')
+            .setDescription('The lobby voice channel of the hub')
+            .addChannelTypes(ChannelType.GuildVoice)
+            .setRequired(true),
+        )
+        .addRoleOption((option) =>
+          option
+            .setName('role1')
+            .setDescription('Role to forbid')
+            .setRequired(true),
+        )
+        .addRoleOption((option) =>
+          option
+            .setName('role2')
+            .setDescription('Additional role to forbid')
+            .setRequired(false),
+        )
+        .addRoleOption((option) =>
+          option
+            .setName('role3')
+            .setDescription('Additional role to forbid')
+            .setRequired(false),
+        )
+        .addRoleOption((option) =>
+          option
+            .setName('role4')
+            .setDescription('Additional role to forbid')
+            .setRequired(false),
+        )
+        .addRoleOption((option) =>
+          option
+            .setName('role5')
+            .setDescription('Additional role to forbid')
+            .setRequired(false),
+        ),
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName('reset')
+        .setDescription('Reset all bot configuration (removes all hubs and settings)'),
     )
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
 
@@ -102,20 +158,20 @@ export const configCommand: Command = {
       case 'show':
         await handleShow(interaction, configService);
         break;
-      case 'set-lobby':
-        await handleSetLobby(interaction, configService);
-        break;
       case 'set-command-channel':
         await handleSetCommandChannel(interaction, configService);
         break;
-      case 'set-category':
-        await handleSetCategory(interaction, configService);
+      case 'add-vc-room':
+        await handleAddVcRoom(interaction, configService);
         break;
-      case 'set-base-role':
-        await handleSetBaseRole(interaction, configService);
+      case 'remove-vc-room':
+        await handleRemoveVcRoom(interaction, configService);
         break;
-      case 'set-roles':
-        await handleSetRoles(interaction, configService);
+      case 'set-vc-room-forbid':
+        await handleSetVcRoomForbid(interaction, configService);
+        break;
+      case 'reset':
+        await handleReset(interaction, configService);
         break;
     }
   },
@@ -124,7 +180,10 @@ export const configCommand: Command = {
 async function handleShow(interaction: ChatInputCommandInteraction, configService: GuildConfigService) {
   const config = await configService.get(interaction.guildId!);
   if (!config) {
-    await interaction.reply({ content: 'Bot is not configured. Run `/setup` first.', ephemeral: true });
+    await interaction.reply({ 
+      content: 'Bot is not configured. Run `/config set-command-channel` first.', 
+      ephemeral: true 
+    });
     return;
   }
 
@@ -132,138 +191,242 @@ async function handleShow(interaction: ChatInputCommandInteraction, configServic
     .setTitle('Bot Configuration')
     .setColor(0x5865f2)
     .addFields(
-      { name: 'Lobby Channel', value: `<#${config.lobbyChannelId}>`, inline: true },
-      { name: 'Command Channel', value: `<#${config.commandChannelId}>`, inline: true },
-      { name: 'Name Prefix', value: config.namePrefix, inline: true },
+      { name: 'Command Channel', value: config.commandChannelId ? `<#${config.commandChannelId}>` : 'Not set', inline: true },
+      { name: 'VC Hubs', value: config.vcHubs.length.toString(), inline: true },
     );
 
-  if (config.targetCategoryId) {
-    embed.addFields({ name: 'Target Category', value: `<#${config.targetCategoryId}>`, inline: true });
-  }
-
-  if (config.baseRoleId) {
-    embed.addFields({ name: 'Base Role', value: `<@&${config.baseRoleId}>`, inline: true });
-  }
-
-  if (Object.keys(config.rolePresets).length > 0) {
-    const presets = Object.entries(config.rolePresets)
-      .map(([name, roles]) => `**${name}**: ${roles.map((r) => `<@&${r}>`).join(', ')}`)
-      .join('\n');
-    embed.addFields({ name: 'Role Presets', value: presets });
+  if (config.vcHubs.length > 0) {
+    for (const hub of config.vcHubs) {
+      const allowRoles = hub.allowRoleIds.map(id => `<@&${id}>`).join(', ') || 'None';
+      const forbidRoles = hub.forbidRoleIds.map(id => `<@&${id}>`).join(', ') || 'None';
+      
+      embed.addFields({
+        name: `📍 ${hub.name}`,
+        value: 
+          `**Lobby**: <#${hub.lobbyChannelId}>\n` +
+          `**Prefix**: ${hub.namePrefix}\n` +
+          `**Allow roles**: ${allowRoles}\n` +
+          `**Forbid roles**: ${forbidRoles}`,
+        inline: false,
+      });
+    }
   }
 
   await interaction.reply({ embeds: [embed], ephemeral: true });
 }
 
-async function handleSetLobby(interaction: ChatInputCommandInteraction, configService: GuildConfigService) {
-  const channel = interaction.options.getChannel('channel', true);
-
-  if (!interaction.guild) {
-    await interaction.reply({ content: 'This command can only be used in a server.', ephemeral: true });
-    return;
-  }
-
-  const lobbyChannel = await interaction.guild.channels.fetch(channel.id);
-  if (!lobbyChannel) {
-    await interaction.reply({ content: 'Could not find that channel.', ephemeral: true });
-    return;
-  }
-  const lobbyCategoryId =
-    lobbyChannel.type === ChannelType.GuildVoice ? lobbyChannel.parentId : null;
-
-  const updated = await configService.update(interaction.guildId!, {
-    lobbyChannelId: channel.id,
-    targetCategoryId: lobbyCategoryId ?? undefined,
-  });
-
-  if (!updated) {
-    await interaction.reply({ content: 'Bot is not configured. Run `/setup` first.', ephemeral: true });
-    return;
-  }
-
-  const categoryMsg = lobbyCategoryId
-    ? ` Rooms will be created in the same category as the lobby.`
-    : '';
-
-  await interaction.reply({
-    content: `✅ Lobby channel updated to <#${channel.id}>.${categoryMsg}`,
-    ephemeral: false,
-  });
-}
-
 async function handleSetCommandChannel(interaction: ChatInputCommandInteraction, configService: GuildConfigService) {
   const channel = interaction.options.getChannel('channel', true);
   
-  const updated = await configService.update(interaction.guildId!, {
-    commandChannelId: channel.id,
-  });
-
-  if (!updated) {
-    await interaction.reply({ content: 'Bot is not configured. Run `/setup` first.', ephemeral: true });
-    return;
-  }
-
-  await interaction.reply({ content: `✅ Command channel updated to <#${channel.id}>`, ephemeral: false });
-}
-
-async function handleSetCategory(interaction: ChatInputCommandInteraction, configService: GuildConfigService) {
-  const category = interaction.options.getChannel('category', true);
+  const config = await configService.ensureGuild(interaction.guildId!, channel.id);
   
-  const updated = await configService.update(interaction.guildId!, {
-    targetCategoryId: category.id,
-  });
-
-  if (!updated) {
-    await interaction.reply({ content: 'Bot is not configured. Run `/setup` first.', ephemeral: true });
-    return;
+  if (config.commandChannelId !== channel.id) {
+    await configService.update(interaction.guildId!, {
+      commandChannelId: channel.id,
+    });
   }
 
-  await interaction.reply({ content: `✅ Target category updated to ${category.name}`, ephemeral: false });
+  await interaction.reply({ 
+    content: `✅ Command channel set to <#${channel.id}>`, 
+    ephemeral: false 
+  });
 }
 
-async function handleSetBaseRole(interaction: ChatInputCommandInteraction, configService: GuildConfigService) {
-  const role = interaction.options.getRole('role', true);
+async function handleAddVcRoom(interaction: ChatInputCommandInteraction, configService: GuildConfigService) {
+  const channel = interaction.options.getChannel('lobby_channel', true);
+  const prefix = interaction.options.getString('prefix', false) || '';
 
-  const updated = await configService.update(interaction.guildId!, {
-    baseRoleId: role.id,
-  });
+  const allowRoleIds: string[] = [];
+  for (let i = 1; i <= 5; i++) {
+    const role = interaction.options.getRole(`role${i}`, false);
+    if (role) {
+      allowRoleIds.push(role.id);
+    }
+  }
 
-  if (!updated) {
-    await interaction.reply({ content: 'Bot is not configured. Run `/setup` first.', ephemeral: true });
+  if (allowRoleIds.length === 0) {
+    await interaction.reply({ 
+      content: '❌ You must specify at least one allowed role.', 
+      ephemeral: true 
+    });
     return;
   }
 
+  const config = await configService.ensureGuild(interaction.guildId!);
+
+  const existingHub = configService.getHubByLobbyId(config, channel.id);
+  if (existingHub) {
+    await interaction.reply({ 
+      content: `❌ Channel <#${channel.id}> is already registered as hub "${existingHub.name}".`, 
+      ephemeral: true 
+    });
+    return;
+  }
+
+  const lobbyChannel = await interaction.guild!.channels.fetch(channel.id);
+  if (!lobbyChannel || lobbyChannel.type !== ChannelType.GuildVoice) {
+    await interaction.reply({ 
+      content: '❌ Invalid voice channel.', 
+      ephemeral: true 
+    });
+    return;
+  }
+
+  const name = lobbyChannel.name;
+  const hubId = configService.nameToId(name);
+  
+  if (config.vcHubs.some(h => h.id === hubId)) {
+    await interaction.reply({ 
+      content: `❌ A hub with that channel name already exists. Channel names must be unique.`, 
+      ephemeral: true 
+    });
+    return;
+  }
+
+  const hub: VcHub = {
+    id: hubId,
+    name,
+    lobbyChannelId: channel.id,
+    namePrefix: prefix,
+    allowRoleIds,
+    forbidRoleIds: [],
+    targetCategoryId: lobbyChannel.parentId ?? undefined,
+  };
+
+  const updated = await configService.addHub(interaction.guildId!, hub);
+  if (!updated) {
+    await interaction.reply({ 
+      content: '❌ Failed to add hub.', 
+      ephemeral: true 
+    });
+    return;
+  }
+
+  const allowRolesStr = allowRoleIds.map(id => `<@&${id}>`).join(', ');
   await interaction.reply({
-    content: `✅ Base role updated to ${role.name}. This role will be denied when rooms are locked.`,
+    content: 
+      `✅ Added VC hub **${name}**\n` +
+      `**Lobby**: <#${channel.id}>\n` +
+      `**Prefix**: ${prefix}\n` +
+      `**Allow roles**: ${allowRolesStr}`,
     ephemeral: false,
   });
 }
 
-async function handleSetRoles(interaction: ChatInputCommandInteraction, configService: GuildConfigService) {
-  const presetName = interaction.options.getString('preset_name', true);
-  const roleIdsStr = interaction.options.getString('role_ids', true);
-  
-  const roleIds = roleIdsStr.split(',').map((id) => id.trim());
+async function handleRemoveVcRoom(interaction: ChatInputCommandInteraction, configService: GuildConfigService) {
+  const channel = interaction.options.getChannel('lobby_channel', true);
 
-  for (const roleId of roleIds) {
-    const role = interaction.guild!.roles.cache.get(roleId);
-    if (!role) {
-      await interaction.reply({ content: `❌ Invalid role ID: ${roleId}`, ephemeral: true });
-      return;
+  const config = await configService.get(interaction.guildId!);
+  if (!config) {
+    await interaction.reply({ 
+      content: 'Bot is not configured.', 
+      ephemeral: true 
+    });
+    return;
+  }
+
+  const hub = configService.getHubByLobbyId(config, channel.id);
+  if (!hub) {
+    await interaction.reply({ 
+      content: `❌ <#${channel.id}> is not registered as a hub lobby.`, 
+      ephemeral: true 
+    });
+    return;
+  }
+
+  const updated = await configService.removeHub(interaction.guildId!, hub.id);
+  if (!updated) {
+    await interaction.reply({ 
+      content: '❌ Failed to remove hub.', 
+      ephemeral: true 
+    });
+    return;
+  }
+
+  await interaction.reply({
+    content: `✅ Removed VC hub **${hub.name}** (lobby: <#${channel.id}>). The Discord channel was not deleted.`,
+    ephemeral: false,
+  });
+}
+
+async function handleSetVcRoomForbid(interaction: ChatInputCommandInteraction, configService: GuildConfigService) {
+  const channel = interaction.options.getChannel('lobby_channel', true);
+
+  const forbidRoleIds: string[] = [];
+  for (let i = 1; i <= 5; i++) {
+    const role = interaction.options.getRole(`role${i}`, false);
+    if (role) {
+      forbidRoleIds.push(role.id);
     }
+  }
+
+  if (forbidRoleIds.length === 0) {
+    await interaction.reply({ 
+      content: '❌ You must specify at least one role to forbid.', 
+      ephemeral: true 
+    });
+    return;
   }
 
   const config = await configService.get(interaction.guildId!);
   if (!config) {
-    await interaction.reply({ content: 'Bot is not configured. Run `/setup` first.', ephemeral: true });
+    await interaction.reply({ 
+      content: 'Bot is not configured.', 
+      ephemeral: true 
+    });
     return;
   }
 
-  const newPresets = { ...config.rolePresets, [presetName]: roleIds };
-  await configService.update(interaction.guildId!, { rolePresets: newPresets });
+  const hub = configService.getHubByLobbyId(config, channel.id);
+  if (!hub) {
+    await interaction.reply({ 
+      content: `❌ <#${channel.id}> is not registered as a hub lobby.`, 
+      ephemeral: true 
+    });
+    return;
+  }
+
+  const updated = await configService.updateHubForbid(interaction.guildId!, hub.id, forbidRoleIds);
+  if (!updated) {
+    await interaction.reply({ 
+      content: '❌ Failed to update forbid roles.', 
+      ephemeral: true 
+    });
+    return;
+  }
+
+  const forbidRolesStr = forbidRoleIds.map(id => `<@&${id}>`).join(', ');
+  await interaction.reply({
+    content: `✅ Updated forbid roles for **${hub.name}**: ${forbidRolesStr}`,
+    ephemeral: false,
+  });
+}
+
+async function handleReset(interaction: ChatInputCommandInteraction, configService: GuildConfigService) {
+  const config = await configService.get(interaction.guildId!);
+  if (!config) {
+    await interaction.reply({ 
+      content: '⚠️ No configuration found. Nothing to reset.', 
+      ephemeral: true 
+    });
+    return;
+  }
+
+  const hubCount = config.vcHubs.length;
+  const hasCommandChannel = !!config.commandChannelId;
+  
+  await configService.delete(interaction.guildId!);
+
+  const removedItems: string[] = [];
+  if (hubCount > 0) removedItems.push(`${hubCount} VC hub(s)`);
+  if (hasCommandChannel) removedItems.push('command channel');
+  if (config.roomControlUi?.enabled) removedItems.push('room control UI');
 
   await interaction.reply({
-    content: `✅ Role preset **${presetName}** configured with ${roleIds.length} role(s).`,
+    content: 
+      `✅ Configuration reset complete.\n` +
+      `Removed: ${removedItems.join(', ')}\n` +
+      `Note: Existing managed rooms will be cleaned up when they become empty.`,
     ephemeral: false,
   });
 }

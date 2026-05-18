@@ -21,13 +21,17 @@ export class RoomControlAuth {
       }
     }
 
-    const room = roomStore.getByOwner(member.id);
-    if (!room) {
-      return { ok: false, reason: "You don't own a managed room." };
+    if (!member.voice.channelId) {
+      return { ok: false, reason: 'You must be in a voice channel to use this control.' };
     }
 
-    if (member.voice.channelId !== room.channelId) {
-      return { ok: false, reason: 'You must be in your voice room to use this control.' };
+    const room = roomStore.get(member.voice.channelId);
+    if (!room) {
+      return { ok: false, reason: "You are not in a managed room." };
+    }
+
+    if (room.ownerUserId !== member.id) {
+      return { ok: false, reason: "You don't own this room." };
     }
 
     return { ok: true, roomChannelId: room.channelId };

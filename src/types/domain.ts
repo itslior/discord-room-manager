@@ -1,11 +1,17 @@
+export interface VcHub {
+  id: string;
+  name: string;
+  lobbyChannelId: string;
+  namePrefix: string;
+  allowRoleIds: string[];
+  forbidRoleIds: string[];
+  targetCategoryId?: string;
+}
+
 export interface GuildConfig {
   guildId: string;
-  lobbyChannelId: string;
   commandChannelId: string;
-  targetCategoryId?: string;
-  namePrefix: string;
-  baseRoleId?: string;
-  rolePresets: Record<string, string[]>;
+  vcHubs: VcHub[];
   createdAt: number;
   updatedAt: number;
   roomControlUi?: {
@@ -22,7 +28,7 @@ export interface ManagedRoom {
   createdAt: number;
   locked: boolean;
   categoryId?: string;
-  rolePresetUsed?: string;
+  hubId: string;
 }
 
 export interface EnvConfig {

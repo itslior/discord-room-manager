@@ -4,12 +4,11 @@ import { configStore } from '../state/ConfigStore';
 import { roomStore } from '../state/RoomStore';
 import { RoomLifecycleService } from '../services/RoomLifecycleService';
 import { ChannelNameAllocator } from '../services/ChannelNameAllocator';
-import { RoleAccessService } from '../services/RoleAccessService';
+import { GuildConfig, VcHub } from '../types/domain';
 
 export function registerVoiceStateUpdate(client: Client): void {
   const lifecycleService = new RoomLifecycleService(client);
   const allocator = new ChannelNameAllocator();
-  const roleAccessService = new RoleAccessService();
 
   client.on(Events.VoiceStateUpdate, async (oldState: VoiceState, newState: VoiceState) => {
     try {
@@ -20,7 +19,7 @@ export function registerVoiceStateUpdate(client: Client): void {
 
       if (!config) return;
 
-      await handleLobbyJoin(newState, oldState, config, lifecycleService, allocator, roleAccessService);
+      await handleLobbyJoin(newState, oldState, config, lifecycleService, allocator);
       await handleRoomEmpty(newState, oldState, lifecycleService);
     } catch (error) {
       logger.error('Error in voice state update handler', error);
@@ -31,50 +30,51 @@ export function registerVoiceStateUpdate(client: Client): void {
 async function handleLobbyJoin(
   newState: VoiceState,
   oldState: VoiceState,
-  config: any,
+  config: GuildConfig,
   lifecycleService: RoomLifecycleService,
   allocator: ChannelNameAllocator,
-  roleAccessService: RoleAccessService,
 ) {
-  if (
-    newState.channelId === config.lobbyChannelId &&
-    oldState.channelId !== config.lobbyChannelId &&
-    newState.member
-  ) {
-    const member = newState.member;
-    const guild = newState.guild;
+  if (!newState.channelId || !newState.member) return;
 
-    const hasAccess = await roleAccessService.checkAccess(member, config);
-    if (!hasAccess) {
-      logger.debug(`User ${member.user.tag} does not have required roles for lobby`);
-      return;
-    }
+  const hub = config.vcHubs.find(h => h.lobbyChannelId === newState.channelId);
+  if (!hub) return;
 
-    const rolePresetUsed = roleAccessService.getPresetUsed(member, config);
-    const channelName = await allocator.allocate(guild, config.namePrefix);
-    
-    const room = await lifecycleService.createRoom(
-      guild,
-      channelName,
-      member,
-      config,
-    );
+  if (oldState.channelId === newState.channelId) return;
 
-    if (room && rolePresetUsed) {
-      await import('../state/RoomStore').then(m => 
-        m.roomStore.update(room.channelId, { rolePresetUsed })
-      );
-    }
+  const member = newState.member;
+  const guild = newState.guild;
 
-    if (room) {
-      try {
-        await member.voice.setChannel(room.channelId);
-        logger.info(`Created and moved ${member.user.tag} to ${channelName}`);
-      } catch (error) {
-        logger.error('Failed to move user to new room', error);
-      }
+  const hasAccess = checkHubAccess(member, hub);
+  if (!hasAccess) {
+    logger.debug(`User ${member.user.tag} does not have required roles for hub ${hub.name}`);
+    return;
+  }
+
+  const channelName = await allocator.allocate(guild, hub.namePrefix);
+  
+  const room = await lifecycleService.createRoom(
+    guild,
+    channelName,
+    member,
+    hub,
+  );
+
+  if (room) {
+    try {
+      await member.voice.setChannel(room.channelId);
+      logger.info(`Created and moved ${member.user.tag} to ${channelName} (hub: ${hub.name})`);
+    } catch (error) {
+      logger.error('Failed to move user to new room', error);
     }
   }
+}
+
+function checkHubAccess(member: any, hub: VcHub): boolean {
+  if (hub.allowRoleIds.length === 0) {
+    return true;
+  }
+
+  return member.roles.cache.some((role: any) => hub.allowRoleIds.includes(role.id));
 }
 
 async function handleRoomEmpty(

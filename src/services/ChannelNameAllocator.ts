@@ -2,8 +2,10 @@ import { Guild, ChannelType } from 'discord.js';
 import { logger } from '../core/Logger';
 
 export class ChannelNameAllocator {
-  async allocate(guild: Guild, prefix: string = 'VC'): Promise<string> {
-    const pattern = new RegExp(`^${prefix}(\\d+)$`);
+  async allocate(guild: Guild, prefix: string = ''): Promise<string> {
+    const nameBase = prefix ? `${prefix} VC` : 'VC';
+    const patternBase = prefix ? `${this.escapeRegex(prefix)} VC` : 'VC';
+    const pattern = new RegExp(`^${this.escapeRegex(patternBase)}(\\d+)$`);
     const existingIndices = new Set<number>();
 
     guild.channels.cache.forEach((channel) => {
@@ -20,9 +22,13 @@ export class ChannelNameAllocator {
       index++;
     }
 
-    const channelName = `${prefix}${index}`;
+    const channelName = `${nameBase}${index}`;
     logger.debug(`Allocated channel name: ${channelName}`);
     return channelName;
+  }
+
+  private escapeRegex(str: string): string {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
   findLowestFreeIndex(existingIndices: number[]): number {

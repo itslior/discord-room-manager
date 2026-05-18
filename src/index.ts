@@ -3,7 +3,6 @@ import { logger } from './core/Logger';
 import { registerVoiceStateUpdate } from './events/VoiceStateUpdate';
 import { registerInteractionCreate } from './events/InteractionCreate';
 
-import { setupCommand } from './commands/Setup';
 import { configCommand } from './commands/Config';
 import { lockCommand } from './commands/Lock';
 import { unlockCommand } from './commands/Unlock';
@@ -16,7 +15,6 @@ async function main() {
 
   const bot = new Bot();
 
-  bot.registerCommand(setupCommand);
   bot.registerCommand(configCommand);
   bot.registerCommand(lockCommand);
   bot.registerCommand(unlockCommand);

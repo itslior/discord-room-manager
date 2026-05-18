@@ -65,7 +65,8 @@ export class ReconciliationService {
         }
       }
 
-      const managedChannels = this.findManagedChannels(guild, config.namePrefix);
+      const prefixes = config.vcHubs.map(h => h.namePrefix);
+      const managedChannels = this.findManagedChannels(guild, prefixes);
 
       for (const channel of managedChannels) {
         if (deletedChannelIds.has(channel.id)) continue;
@@ -88,13 +89,19 @@ export class ReconciliationService {
     return { preserved, cleaned, orphaned };
   }
 
-  private findManagedChannels(guild: Guild, prefix: string): VoiceChannel[] {
-    const pattern = new RegExp(`^${prefix}\\d+$`);
+  private findManagedChannels(guild: Guild, prefixes: string[]): VoiceChannel[] {
+    const patterns = prefixes.map(prefix => {
+      const basePattern = prefix ? `${prefix} VC` : 'VC';
+      const escaped = basePattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return new RegExp(`^${escaped}\\d+$`);
+    });
     const managedChannels: VoiceChannel[] = [];
 
     for (const channel of guild.channels.cache.values()) {
       if (channel.type !== ChannelType.GuildVoice) continue;
-      if (!pattern.test(channel.name)) continue;
+      
+      const matchesAnyPattern = patterns.some(pattern => pattern.test(channel.name));
+      if (!matchesAnyPattern) continue;
 
       const botOverwrite = channel.permissionOverwrites.cache.get(this.client.user!.id);
       if (!botOverwrite?.allow.has(PermissionFlagsBits.ManageChannels)) continue;

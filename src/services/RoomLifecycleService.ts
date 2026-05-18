@@ -8,7 +8,7 @@ import {
   VoiceChannel,
   EmbedBuilder,
 } from 'discord.js';
-import { ManagedRoom, GuildConfig } from '../types/domain';
+import { ManagedRoom, VcHub } from '../types/domain';
 import { roomStore } from '../state/RoomStore';
 import { logger } from '../core/Logger';
 export class RoomLifecycleService {
@@ -18,7 +18,7 @@ export class RoomLifecycleService {
     guild: Guild,
     channelName: string,
     owner: GuildMember,
-    config: GuildConfig,
+    hub: VcHub,
   ): Promise<ManagedRoom | null> {
     const botMember = guild.members.me;
     if (!botMember) {
@@ -42,7 +42,7 @@ export class RoomLifecycleService {
       return null;
     }
 
-    const categoryId = this.resolveRoomCategoryId(guild, config);
+    const categoryId = this.resolveRoomCategoryId(guild, hub);
 
     if (
       categoryId &&
@@ -55,13 +55,38 @@ export class RoomLifecycleService {
       return null;
     }
 
-    const botOverwrite: OverwriteResolvable = {
-      id: this.client.user!.id,
-      allow: [PermissionFlagsBits.ManageChannels],
-    };
+    const overwrites: OverwriteResolvable[] = [
+      {
+        id: this.client.user!.id,
+        allow: [
+          PermissionFlagsBits.ManageChannels,
+          PermissionFlagsBits.ViewChannel,
+          PermissionFlagsBits.Connect,
+          PermissionFlagsBits.MoveMembers,
+        ],
+      },
+      {
+        id: guild.id,
+        deny: [PermissionFlagsBits.Connect],
+      },
+    ];
+
+    for (const roleId of hub.allowRoleIds) {
+      overwrites.push({
+        id: roleId,
+        allow: [PermissionFlagsBits.Connect],
+      });
+    }
+
+    for (const roleId of hub.forbidRoleIds) {
+      overwrites.push({
+        id: roleId,
+        deny: [PermissionFlagsBits.Connect],
+      });
+    }
 
     try {
-      const channel = await this.createVoiceChannel(guild, channelName, categoryId, [botOverwrite]);
+      const channel = await this.createVoiceChannel(guild, channelName, categoryId, overwrites);
 
       const room: ManagedRoom = {
         channelId: channel.id,
@@ -70,6 +95,7 @@ export class RoomLifecycleService {
         createdAt: Date.now(),
         locked: false,
         categoryId: categoryId ?? undefined,
+        hubId: hub.id,
       };
 
       await roomStore.add(room);
@@ -82,13 +108,12 @@ export class RoomLifecycleService {
     }
   }
 
-  /** Uses the lobby voice channel's category so new rooms appear next to the lobby. */
-  resolveRoomCategoryId(guild: Guild, config: GuildConfig): string | null {
-    const lobby = guild.channels.cache.get(config.lobbyChannelId);
+  resolveRoomCategoryId(guild: Guild, hub: VcHub): string | null {
+    const lobby = guild.channels.cache.get(hub.lobbyChannelId);
     if (lobby?.type === ChannelType.GuildVoice && lobby.parentId) {
       return lobby.parentId;
     }
-    return config.targetCategoryId ?? null;
+    return hub.targetCategoryId ?? null;
   }
 
   private async createVoiceChannel(
@@ -138,23 +163,15 @@ export class RoomLifecycleService {
     }
   }
 
-  async lockRoom(channelId: string, guild: Guild, config: GuildConfig, rolePresetUsed?: string): Promise<void> {
+  async lockRoom(channelId: string, guild: Guild, hub: VcHub): Promise<void> {
     try {
       const channel = guild.channels.cache.get(channelId);
       if (!channel || channel.type !== ChannelType.GuildVoice) return;
 
-      const baseRoleId = config.baseRoleId || guild.id;
-      await channel.permissionOverwrites.edit(baseRoleId, {
-        Connect: false,
-      });
-
-      if (rolePresetUsed && config.rolePresets[rolePresetUsed]) {
-        const roles = config.rolePresets[rolePresetUsed];
-        for (const roleId of roles) {
-          await channel.permissionOverwrites.edit(roleId, {
-            Connect: false,
-          });
-        }
+      for (const roleId of hub.allowRoleIds) {
+        await channel.permissionOverwrites.edit(roleId, {
+          Connect: false,
+        });
       }
 
       await roomStore.update(channelId, { locked: true });
@@ -165,23 +182,15 @@ export class RoomLifecycleService {
     }
   }
 
-  async unlockRoom(channelId: string, guild: Guild, config: GuildConfig, rolePresetUsed?: string): Promise<void> {
+  async unlockRoom(channelId: string, guild: Guild, hub: VcHub): Promise<void> {
     try {
       const channel = guild.channels.cache.get(channelId);
       if (!channel || channel.type !== ChannelType.GuildVoice) return;
 
-      const baseRoleId = config.baseRoleId || guild.id;
-      await channel.permissionOverwrites.edit(baseRoleId, {
-        Connect: null,
-      });
-
-      if (rolePresetUsed && config.rolePresets[rolePresetUsed]) {
-        const roles = config.rolePresets[rolePresetUsed];
-        for (const roleId of roles) {
-          await channel.permissionOverwrites.edit(roleId, {
-            Connect: null,
-          });
-        }
+      for (const roleId of hub.allowRoleIds) {
+        await channel.permissionOverwrites.edit(roleId, {
+          Connect: true,
+        });
       }
 
       await roomStore.update(channelId, { locked: false });

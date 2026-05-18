@@ -2,7 +2,6 @@ import { REST, Routes } from 'discord.js';
 import { env } from '../config/Env';
 import { logger } from '../core/Logger';
 
-import { setupCommand } from '../commands/Setup';
 import { configCommand } from '../commands/Config';
 import { lockCommand } from '../commands/Lock';
 import { unlockCommand } from '../commands/Unlock';
@@ -11,7 +10,6 @@ import { transferCommand } from '../commands/Transfer';
 import { setRoomControlUiCommand } from '../commands/SetRoomControlUi';
 
 const commands = [
-  setupCommand,
   configCommand,
   lockCommand,
   unlockCommand,

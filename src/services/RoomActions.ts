@@ -38,15 +38,15 @@ export class RoomActions {
       return { ok: false, message: 'Bot configuration not found.' };
     }
 
-    try {
-      await this.lifecycleService.lockRoom(authCheck.roomChannelId!, guild, config, room.rolePresetUsed);
+    const hub = config.vcHubs.find(h => h.id === room.hubId);
+    if (!hub) {
+      return { ok: false, message: 'Hub configuration not found for this room.' };
+    }
 
-      const deniedRoles = [config.baseRoleId ? `<@&${config.baseRoleId}>` : '@everyone'];
-      if (room.rolePresetUsed && config.rolePresets[room.rolePresetUsed]) {
-        config.rolePresets[room.rolePresetUsed].forEach((roleId) => {
-          deniedRoles.push(`<@&${roleId}>`);
-        });
-      }
+    try {
+      await this.lifecycleService.lockRoom(authCheck.roomChannelId!, guild, hub);
+
+      const deniedRoles = hub.allowRoleIds.map(id => `<@&${id}>`);
 
       return {
         ok: true,
@@ -78,8 +78,13 @@ export class RoomActions {
       return { ok: false, message: 'Bot configuration not found.' };
     }
 
+    const hub = config.vcHubs.find(h => h.id === room.hubId);
+    if (!hub) {
+      return { ok: false, message: 'Hub configuration not found for this room.' };
+    }
+
     try {
-      await this.lifecycleService.unlockRoom(authCheck.roomChannelId!, guild, config, room.rolePresetUsed);
+      await this.lifecycleService.unlockRoom(authCheck.roomChannelId!, guild, hub);
 
       return {
         ok: true,
