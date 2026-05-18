@@ -47,12 +47,13 @@ APPLICATION_ID=your_application_id_here
 Use this invite URL (replace `<APPLICATION_ID>` with your bot's Application ID):
 
 ```
-https://discord.com/api/oauth2/authorize?client_id=<APPLICATION_ID>&permissions=16785488&scope=bot%20applications.commands
+https://discord.com/api/oauth2/authorize?client_id=<APPLICATION_ID>&permissions=2432700408&scope=bot%20applications.commands
 ```
 
 **Required Permissions:**
 - View Channels
 - Manage Channels
+- Manage Roles (required to set room permission overwrites)
 - Move Members
 - Send Messages
 - Use Slash Commands

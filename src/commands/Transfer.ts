@@ -57,15 +57,27 @@ export const transferCommand: Command = {
 
     try {
       const lifecycleService = new RoomLifecycleService(interaction.client);
-      await lifecycleService.transferOwnership(
+      const result = await lifecycleService.transferOwnership(
         roomChannelId,
         interaction.guild,
         interaction.user.id,
         targetMember.id,
       );
 
+      if (!result.ok) {
+        await interaction.reply({
+          content: result.warning ?? 'Failed to transfer ownership.',
+          ephemeral: true,
+        });
+        return;
+      }
+
+      const roomLabel = `<#${roomChannelId}>`;
+
       await interaction.reply({
-        content: `✅ Ownership transferred to ${targetMember.user.tag}. They are now the room owner.`,
+        content:
+          `✅ Ownership of ${roomLabel} transferred from <@${interaction.user.id}> to <@${targetMember.id}>.` +
+          (result.warning ? `\n\n⚠️ ${result.warning}` : ''),
         ephemeral: false,
       });
       logger.info(`User ${interaction.user.tag} transferred ownership to ${targetMember.user.tag}`);

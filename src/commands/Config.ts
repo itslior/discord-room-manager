@@ -157,9 +157,23 @@ async function handleShow(interaction: ChatInputCommandInteraction, configServic
 
 async function handleSetLobby(interaction: ChatInputCommandInteraction, configService: GuildConfigService) {
   const channel = interaction.options.getChannel('channel', true);
-  
+
+  if (!interaction.guild) {
+    await interaction.reply({ content: 'This command can only be used in a server.', ephemeral: true });
+    return;
+  }
+
+  const lobbyChannel = await interaction.guild.channels.fetch(channel.id);
+  if (!lobbyChannel) {
+    await interaction.reply({ content: 'Could not find that channel.', ephemeral: true });
+    return;
+  }
+  const lobbyCategoryId =
+    lobbyChannel.type === ChannelType.GuildVoice ? lobbyChannel.parentId : null;
+
   const updated = await configService.update(interaction.guildId!, {
     lobbyChannelId: channel.id,
+    targetCategoryId: lobbyCategoryId ?? undefined,
   });
 
   if (!updated) {
@@ -167,7 +181,14 @@ async function handleSetLobby(interaction: ChatInputCommandInteraction, configSe
     return;
   }
 
-  await interaction.reply({ content: `✅ Lobby channel updated to <#${channel.id}>`, ephemeral: false });
+  const categoryMsg = lobbyCategoryId
+    ? ` Rooms will be created in the same category as the lobby.`
+    : '';
+
+  await interaction.reply({
+    content: `✅ Lobby channel updated to <#${channel.id}>.${categoryMsg}`,
+    ephemeral: false,
+  });
 }
 
 async function handleSetCommandChannel(interaction: ChatInputCommandInteraction, configService: GuildConfigService) {
@@ -202,7 +223,7 @@ async function handleSetCategory(interaction: ChatInputCommandInteraction, confi
 
 async function handleSetBaseRole(interaction: ChatInputCommandInteraction, configService: GuildConfigService) {
   const role = interaction.options.getRole('role', true);
-  
+
   const updated = await configService.update(interaction.guildId!, {
     baseRoleId: role.id,
   });

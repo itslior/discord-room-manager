@@ -51,15 +51,28 @@ export const takeOwnershipCommand: Command = {
         return;
       }
 
-      await lifecycleService.transferOwnership(
+      const result = await lifecycleService.transferOwnership(
         currentChannelId,
         interaction.guild,
         room.ownerUserId,
         member.id,
       );
 
+      if (!result.ok) {
+        await interaction.reply({
+          content: result.warning ?? 'Failed to transfer ownership.',
+          ephemeral: true,
+        });
+        return;
+      }
+
+      const voiceChannel = interaction.guild.channels.cache.get(currentChannelId);
+      const roomLabel = voiceChannel ? `<#${currentChannelId}>` : 'the room';
+
       await interaction.reply({
-        content: `✅ You are now the owner of this room!`,
+        content:
+          `✅ <@${member.id}> is now the owner of ${roomLabel}.` +
+          (result.warning ? `\n\n⚠️ ${result.warning}` : ''),
         ephemeral: false,
       });
       logger.info(`User ${member.user.tag} took ownership of room ${currentChannelId}`);

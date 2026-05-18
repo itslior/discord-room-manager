@@ -31,7 +31,7 @@ export const setupCommand: Command = {
     .addChannelOption((option) =>
       option
         .setName('category')
-        .setDescription('Category where managed rooms will be created')
+        .setDescription('Only if lobby has no category: where to create rooms')
         .addChannelTypes(ChannelType.GuildCategory)
         .setRequired(false),
     )
@@ -75,22 +75,36 @@ export const setupCommand: Command = {
     }
 
     try {
+      const lobbyChannel = await interaction.guild.channels.fetch(lobby.id);
+      if (!lobbyChannel) {
+        await interaction.reply({ content: 'Could not find the lobby channel.', ephemeral: true });
+        return;
+      }
+      const lobbyCategoryId =
+        lobbyChannel.type === ChannelType.GuildVoice ? lobbyChannel.parentId : null;
+
       await configService.create({
         guildId: interaction.guildId,
         lobbyChannelId: lobby.id,
         commandChannelId: commandChannel.id,
-        targetCategoryId: category?.id,
+        targetCategoryId: lobbyCategoryId ?? category?.id,
         namePrefix: prefix,
         rolePresets: {},
       });
 
       logger.info(`Bot configured for guild ${interaction.guild.name} (${interaction.guildId})`);
 
+      const categoryNote = lobbyCategoryId
+        ? `**Rooms category:** same as lobby (<#${lobbyCategoryId}>)\n`
+        : category
+          ? `**Rooms category:** ${category.name}\n`
+          : '**Rooms category:** top level (lobby has no category)\n';
+
       await interaction.reply({
         content: `✅ **Bot configured successfully!**\n\n` +
           `**Lobby:** <#${lobby.id}>\n` +
           `**Command Channel:** <#${commandChannel.id}>\n` +
-          `${category ? `**Category:** ${category.name}\n` : ''}` +
+          categoryNote +
           `**Name Prefix:** ${prefix}\n\n` +
           `Users joining the lobby will automatically get their own voice channel!`,
         ephemeral: false,
