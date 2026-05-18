@@ -211,6 +211,33 @@ export class RoomActions {
     }
   }
 
+  async runGiveAccess(actor: GuildMember, guild: Guild, targetId: string): Promise<ActionResult> {
+    const authCheck = this.auth.checkOwnerInRoom(actor);
+    if (!authCheck.ok) {
+      return { ok: false, message: authCheck.reason };
+    }
+
+    if (targetId === actor.id) {
+      return { ok: false, message: 'You cannot give access to yourself.' };
+    }
+
+    const channel = guild.channels.cache.get(authCheck.roomChannelId!);
+    if (!channel || channel.type !== 2) {
+      return { ok: false, message: 'Voice channel not found.' };
+    }
+
+    try {
+      await this.lifecycleService.giveAccessMember(channel as any, targetId);
+      return {
+        ok: true,
+        message: `🔑 Gave <@${targetId}> access to the room.`,
+      };
+    } catch (error) {
+      logger.error('Failed to give access to member', error);
+      return { ok: false, message: 'Failed to give access. Please try again.' };
+    }
+  }
+
   async runPassOwnership(actor: GuildMember, guild: Guild, targetId: string): Promise<ActionResult> {
     const authCheck = this.auth.checkOwnerInRoom(actor);
     if (!authCheck.ok) {

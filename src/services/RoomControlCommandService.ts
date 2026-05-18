@@ -21,6 +21,9 @@ export class RoomControlCommandService {
         .setName('Unban from Room')
         .setType(ApplicationCommandType.User),
       new ContextMenuCommandBuilder()
+        .setName('Give Access to Room')
+        .setType(ApplicationCommandType.User),
+      new ContextMenuCommandBuilder()
         .setName('Pass Ownership')
         .setType(ApplicationCommandType.User),
     ].map(cmd => cmd.toJSON());

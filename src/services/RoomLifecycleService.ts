@@ -254,6 +254,13 @@ export class RoomLifecycleService {
     }
   }
 
+  async giveAccessMember(channel: VoiceChannel, userId: string): Promise<void> {
+    await channel.permissionOverwrites.edit(userId, {
+      Connect: true,
+    });
+    logger.info(`Gave access to user ${userId} for channel ${channel.name}`);
+  }
+
   getRoomStatus(channel: VoiceChannel, room: ManagedRoom): EmbedBuilder {
     const embed = new EmbedBuilder()
       .setTitle(`Room Status: ${channel.name}`)
@@ -268,14 +275,23 @@ export class RoomLifecycleService {
     embed.addFields({ name: 'Current Members', value: members });
 
     const bannedUsers: string[] = [];
+    const usersWithAccess: string[] = [];
     channel.permissionOverwrites.cache.forEach((overwrite, id) => {
-      if (overwrite.type === 1 && overwrite.deny.has(PermissionFlagsBits.Connect)) {
-        bannedUsers.push(`<@${id}>`);
+      if (overwrite.type === 1) {
+        if (overwrite.deny.has(PermissionFlagsBits.Connect)) {
+          bannedUsers.push(`<@${id}>`);
+        } else if (overwrite.allow.has(PermissionFlagsBits.Connect)) {
+          usersWithAccess.push(`<@${id}>`);
+        }
       }
     });
 
     if (bannedUsers.length > 0) {
       embed.addFields({ name: 'Banned Users', value: bannedUsers.join(', ') });
+    }
+
+    if (usersWithAccess.length > 0) {
+      embed.addFields({ name: 'Users With Access', value: usersWithAccess.join(', ') });
     }
 
     return embed;

@@ -65,6 +65,41 @@ export async function handleButtonInteraction(interaction: ButtonInteraction): P
         break;
       }
 
+      case 'give-access': {
+        const authCheck = auth.checkOwnerInRoom(interaction.member, true);
+        if (!authCheck.ok) {
+          await interaction.reply({
+            content: authCheck.reason || 'Authorization failed.',
+            ephemeral: true,
+          });
+          return;
+        }
+
+        const channel = interaction.guild.channels.cache.get(authCheck.roomChannelId!);
+        if (!channel || channel.type !== 2) {
+          await interaction.reply({
+            content: 'Voice channel not found.',
+            ephemeral: true,
+          });
+          return;
+        }
+
+        const row = new ActionRowBuilder<UserSelectMenuBuilder>().addComponents(
+          new UserSelectMenuBuilder()
+            .setCustomId('rc:select:give-access')
+            .setPlaceholder('Select a user to give access')
+            .setMinValues(1)
+            .setMaxValues(1)
+        );
+
+        await interaction.reply({
+          content: 'Select a user to give access:',
+          components: [row],
+          ephemeral: true,
+        });
+        break;
+      }
+
       case 'kick':
       case 'ban':
       case 'unban':
@@ -156,6 +191,9 @@ export async function handleUserSelectInteraction(interaction: UserSelectMenuInt
       case 'unban':
         result = await roomActions.runUnban(interaction.member, interaction.guild, targetId);
         break;
+      case 'give-access':
+        result = await roomActions.runGiveAccess(interaction.member, interaction.guild, targetId);
+        break;
       case 'pass':
         result = await roomActions.runPassOwnership(interaction.member, interaction.guild, targetId);
         break;
@@ -212,6 +250,9 @@ export async function handleUserContextMenuInteraction(interaction: UserContextM
         break;
       case 'Unban from Room':
         result = await roomActions.runUnban(interaction.member, interaction.guild, targetId);
+        break;
+      case 'Give Access to Room':
+        result = await roomActions.runGiveAccess(interaction.member, interaction.guild, targetId);
         break;
       case 'Pass Ownership':
         result = await roomActions.runPassOwnership(interaction.member, interaction.guild, targetId);
