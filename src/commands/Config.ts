@@ -7,7 +7,6 @@ import {
 } from 'discord.js';
 import { Command } from './types';
 import { GuildConfigService } from '../services/GuildConfigService';
-import { logger } from '../core/Logger';
 
 const configService = new GuildConfigService();
 
