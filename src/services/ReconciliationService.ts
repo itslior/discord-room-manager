@@ -91,9 +91,9 @@ export class ReconciliationService {
 
   private findManagedChannels(guild: Guild, prefixes: string[]): VoiceChannel[] {
     const patterns = prefixes.map(prefix => {
-      const basePattern = prefix ? `${prefix} VC` : 'VC';
+      const basePattern = prefix ? `${prefix} Voice` : 'Voice';
       const escaped = basePattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      return new RegExp(`^${escaped}\\d+$`);
+      return new RegExp(`^${escaped} \\d+$`);
     });
     const managedChannels: VoiceChannel[] = [];
 

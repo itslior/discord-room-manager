@@ -3,9 +3,8 @@ import { logger } from '../core/Logger';
 
 export class ChannelNameAllocator {
   async allocate(guild: Guild, prefix: string = ''): Promise<string> {
-    const nameBase = prefix ? `${prefix} VC` : 'VC';
-    const patternBase = prefix ? `${this.escapeRegex(prefix)} VC` : 'VC';
-    const pattern = new RegExp(`^${this.escapeRegex(patternBase)}(\\d+)$`);
+    const nameBase = prefix ? `${prefix} Voice` : 'Voice';
+    const pattern = new RegExp(`^${this.escapeRegex(nameBase)} (\\d+)$`);
     const existingIndices = new Set<number>();
 
     guild.channels.cache.forEach((channel) => {
@@ -22,7 +21,7 @@ export class ChannelNameAllocator {
       index++;
     }
 
-    const channelName = `${nameBase}${index}`;
+    const channelName = `${nameBase} ${index}`;
     logger.debug(`Allocated channel name: ${channelName}`);
     return channelName;
   }

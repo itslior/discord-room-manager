@@ -76,7 +76,7 @@ export const configCommand: Command = {
         .addStringOption((option) =>
           option
             .setName('prefix')
-            .setDescription('Room name prefix (e.g., "General" → "General VC1", empty → "VC1")')
+            .setDescription('Room name prefix (e.g., "General" → "General Voice 1", empty → "Voice 1")')
             .setRequired(false),
         ),
     )
