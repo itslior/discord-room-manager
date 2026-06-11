@@ -11,6 +11,7 @@ import {
 import { ManagedRoom, VcHub } from '../types/domain';
 import { roomStore } from '../state/RoomStore';
 import { logger } from '../core/Logger';
+import { addLockedPrefix, hasLockedPrefix, removeLockedPrefix } from '../utils/roomChannelName';
 export class RoomLifecycleService {
   constructor(private client: Client) {}
 
@@ -174,6 +175,10 @@ export class RoomLifecycleService {
         });
       }
 
+      if (!hasLockedPrefix(channel.name)) {
+        await channel.setName(addLockedPrefix(channel.name));
+      }
+
       await roomStore.update(channelId, { locked: true });
       logger.info(`Locked room ${channel.name} (${channelId})`);
     } catch (error) {
@@ -191,6 +196,10 @@ export class RoomLifecycleService {
         await channel.permissionOverwrites.edit(roleId, {
           Connect: true,
         });
+      }
+
+      if (hasLockedPrefix(channel.name)) {
+        await channel.setName(removeLockedPrefix(channel.name));
       }
 
       await roomStore.update(channelId, { locked: false });

@@ -8,6 +8,7 @@ import {
 import { roomStore } from '../state/RoomStore';
 import { configStore } from '../state/ConfigStore';
 import { logger } from '../core/Logger';
+import { removeLockedPrefix } from '../utils/roomChannelName';
 
 export class ReconciliationService {
   constructor(private client: Client) {}
@@ -100,7 +101,9 @@ export class ReconciliationService {
     for (const channel of guild.channels.cache.values()) {
       if (channel.type !== ChannelType.GuildVoice) continue;
       
-      const matchesAnyPattern = patterns.some(pattern => pattern.test(channel.name));
+      const matchesAnyPattern = patterns.some(pattern =>
+        pattern.test(removeLockedPrefix(channel.name)),
+      );
       if (!matchesAnyPattern) continue;
 
       const botOverwrite = channel.permissionOverwrites.cache.get(this.client.user!.id);

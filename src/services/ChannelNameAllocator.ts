@@ -1,5 +1,6 @@
 import { Guild, ChannelType } from 'discord.js';
 import { logger } from '../core/Logger';
+import { removeLockedPrefix } from '../utils/roomChannelName';
 
 export class ChannelNameAllocator {
   async allocate(guild: Guild, prefix: string = ''): Promise<string> {
@@ -9,7 +10,7 @@ export class ChannelNameAllocator {
 
     guild.channels.cache.forEach((channel) => {
       if (channel.type === ChannelType.GuildVoice) {
-        const match = channel.name.match(pattern);
+        const match = removeLockedPrefix(channel.name).match(pattern);
         if (match) {
           existingIndices.add(parseInt(match[1], 10));
         }
