@@ -187,6 +187,21 @@ export class RoomLifecycleService {
     }
   }
 
+  async setUserLimit(channelId: string, guild: Guild, limit: number): Promise<void> {
+    try {
+      const channel = guild.channels.cache.get(channelId);
+      if (!channel || channel.type !== ChannelType.GuildVoice) return;
+
+      await channel.setUserLimit(limit);
+      logger.info(
+        `Set user limit to ${limit === 0 ? 'unlimited' : limit} for ${channel.name} (${channelId})`,
+      );
+    } catch (error) {
+      logger.error(`Failed to set user limit for room ${channelId}`, error);
+      throw error;
+    }
+  }
+
   async unlockRoom(channelId: string, guild: Guild, hub: VcHub): Promise<void> {
     try {
       const channel = guild.channels.cache.get(channelId);
@@ -286,7 +301,12 @@ export class RoomLifecycleService {
       .addFields(
         { name: 'Owner', value: `<@${room.ownerUserId}>`, inline: true },
         { name: 'Locked', value: room.locked ? 'Yes' : 'No', inline: true },
-        { name: 'Members', value: `${channel.members.size}`, inline: true }
+        { name: 'Members', value: `${channel.members.size}`, inline: true },
+        {
+          name: 'User Limit',
+          value: channel.userLimit === 0 ? 'Unlimited' : `${channel.userLimit}`,
+          inline: true,
+        },
       );
 
     const members = channel.members.map(m => `<@${m.id}>`).join(', ') || 'None';

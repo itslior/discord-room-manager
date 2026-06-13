@@ -1,15 +1,43 @@
 import {
   ButtonInteraction,
   UserSelectMenuInteraction,
+  StringSelectMenuInteraction,
   UserContextMenuCommandInteraction,
   GuildMember,
   ActionRowBuilder,
   UserSelectMenuBuilder,
+  StringSelectMenuBuilder,
 } from 'discord.js';
 import { RoomLifecycleService } from '../services/RoomLifecycleService';
 import { RoomActions } from '../services/RoomActions';
 import { RoomControlAuth } from '../services/RoomControlAuth';
 import { logger } from '../core/Logger';
+
+const USER_LIMIT_MIN = 2;
+const USER_LIMIT_MAX = 12;
+
+function buildUserLimitSelectMenu(): StringSelectMenuBuilder {
+  const options = [
+    {
+      label: 'Unlimited',
+      value: '0',
+      description: 'No limit on how many can join',
+    },
+    ...Array.from({ length: USER_LIMIT_MAX - USER_LIMIT_MIN + 1 }, (_, i) => {
+      const count = i + USER_LIMIT_MIN;
+      return {
+        label: `${count} users`,
+        value: String(count),
+        description: `Maximum ${count} people in the room`,
+      };
+    }),
+  ];
+
+  return new StringSelectMenuBuilder()
+    .setCustomId('rc:select:user-limit')
+    .setPlaceholder('Select a user limit')
+    .addOptions(options);
+}
 
 export async function handleButtonInteraction(interaction: ButtonInteraction): Promise<void> {
   if (!interaction.customId.startsWith('rc:')) return;
@@ -35,6 +63,28 @@ export async function handleButtonInteraction(interaction: ButtonInteraction): P
         const result = await roomActions.runUnlock(interaction.member, interaction.guild);
         await interaction.reply({
           content: result.message || 'An error occurred.',
+          ephemeral: true,
+        });
+        break;
+      }
+
+      case 'user-limit': {
+        const authCheck = auth.checkOwnerInRoom(interaction.member, true);
+        if (!authCheck.ok) {
+          await interaction.reply({
+            content: authCheck.reason || 'Authorization failed.',
+            ephemeral: true,
+          });
+          return;
+        }
+
+        const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+          buildUserLimitSelectMenu(),
+        );
+
+        await interaction.reply({
+          content: 'Select the maximum number of users allowed in your room:',
+          components: [row],
           ephemeral: true,
         });
         break;
@@ -207,6 +257,35 @@ export async function handleUserSelectInteraction(interaction: UserSelectMenuInt
     });
   } catch (error) {
     logger.error('Error handling user select interaction', error);
+    await interaction.update({
+      content: 'An error occurred while processing your request.',
+      components: [],
+    });
+  }
+}
+
+export async function handleStringSelectInteraction(
+  interaction: StringSelectMenuInteraction,
+): Promise<void> {
+  if (!interaction.customId.startsWith('rc:select:')) return;
+  if (!interaction.guild || !(interaction.member instanceof GuildMember)) return;
+
+  const action = interaction.customId.slice(10);
+  if (action !== 'user-limit') return;
+
+  const limit = parseInt(interaction.values[0], 10);
+  const lifecycleService = new RoomLifecycleService(interaction.client);
+  const roomActions = new RoomActions(lifecycleService);
+
+  try {
+    const result = await roomActions.runSetUserLimit(interaction.member, interaction.guild, limit);
+
+    await interaction.update({
+      content: result.message || 'An error occurred.',
+      components: [],
+    });
+  } catch (error) {
+    logger.error('Error handling string select interaction', error);
     await interaction.update({
       content: 'An error occurred while processing your request.',
       components: [],

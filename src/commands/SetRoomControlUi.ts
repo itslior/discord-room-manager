@@ -61,6 +61,7 @@ export const setRoomControlUiCommand: Command = {
           'Click a button while in your voice room. Only you see the result.\n\n' +
           '**Lock** - prevent others from joining\n' +
           '**Unlock** - allow others to join\n' +
+          '**User Limit** - set max people (unlimited or 2-12)\n' +
           '**Kick** - remove someone temporarily\n' +
           '**Ban** - block someone from joining\n' +
           '**Unban** - remove block\n' +
@@ -100,6 +101,11 @@ export const setRoomControlUiCommand: Command = {
       );
 
       const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId('rc:user-limit')
+          .setLabel('User Limit')
+          .setEmoji('👥')
+          .setStyle(ButtonStyle.Secondary),
         new ButtonBuilder()
           .setCustomId('rc:claim')
           .setLabel('Claim')

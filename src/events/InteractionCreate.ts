@@ -4,6 +4,7 @@ import { Bot } from '../core/Bot';
 import {
   handleButtonInteraction,
   handleUserSelectInteraction,
+  handleStringSelectInteraction,
   handleUserContextMenuInteraction,
 } from '../interactions/roomControlInteractions';
 
@@ -23,6 +24,8 @@ export function registerInteractionCreate(bot: Bot): void {
         await handleButtonInteraction(interaction);
       } else if (interaction.isUserSelectMenu()) {
         await handleUserSelectInteraction(interaction);
+      } else if (interaction.isStringSelectMenu()) {
+        await handleStringSelectInteraction(interaction);
       } else if (interaction.isUserContextMenuCommand()) {
         await handleUserContextMenuInteraction(interaction);
       }

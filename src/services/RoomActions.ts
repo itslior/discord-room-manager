@@ -281,6 +281,40 @@ export class RoomActions {
     }
   }
 
+  async runSetUserLimit(actor: GuildMember, guild: Guild, limit: number): Promise<ActionResult> {
+    const authCheck = this.auth.checkOwnerInRoom(actor);
+    if (!authCheck.ok) {
+      return { ok: false, message: authCheck.reason };
+    }
+
+    if (limit !== 0 && (limit < 2 || limit > 12)) {
+      return { ok: false, message: 'User limit must be unlimited or between 2 and 12.' };
+    }
+
+    const channel = guild.channels.cache.get(authCheck.roomChannelId!);
+    if (!channel || channel.type !== 2) {
+      return { ok: false, message: 'Voice channel not found.' };
+    }
+
+    if (channel.userLimit === limit) {
+      const label = limit === 0 ? 'unlimited' : `${limit}`;
+      return { ok: false, message: `User limit is already set to ${label}.` };
+    }
+
+    try {
+      await this.lifecycleService.setUserLimit(authCheck.roomChannelId!, guild, limit);
+
+      const label = limit === 0 ? 'unlimited' : `${limit}`;
+      return {
+        ok: true,
+        message: `👥 User limit set to **${label}**.`,
+      };
+    } catch (error) {
+      logger.error('Failed to set user limit', error);
+      return { ok: false, message: 'Failed to set user limit. Please try again.' };
+    }
+  }
+
   async runStatus(actor: GuildMember, guild: Guild): Promise<ActionResult> {
     const authCheck = this.auth.checkOwnerInRoom(actor);
     if (!authCheck.ok) {
