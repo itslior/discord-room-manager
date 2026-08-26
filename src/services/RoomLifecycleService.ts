@@ -175,6 +175,11 @@ export class RoomLifecycleService {
         });
       }
 
+      const room = roomStore.get(channelId);
+      if (room) {
+        await this.giveAccessMember(channel, room.ownerUserId);
+      }
+
       if (!hasLockedPrefix(channel.name)) {
         await channel.setName(addLockedPrefix(channel.name));
       }
