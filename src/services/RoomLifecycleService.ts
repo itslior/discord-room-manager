@@ -246,6 +246,8 @@ export class RoomLifecycleService {
       return { ok: false, warning: 'New owner not found in this server.' };
     }
 
+    const room = roomStore.get(channelId);
+
     try {
       await channel.permissionOverwrites.delete(oldOwnerId, 'Ownership transferred - cleanup');
     } catch (error) {
@@ -253,6 +255,11 @@ export class RoomLifecycleService {
     }
 
     await roomStore.update(channelId, { ownerUserId: newOwnerId });
+
+    if (room?.locked) {
+      await this.giveAccessMember(channel, newOwnerId);
+    }
+
     logger.info(`Transferred ownership of ${channel.name} from ${oldOwnerId} to ${newOwnerId}`);
 
     return { ok: true };

@@ -222,10 +222,6 @@ export class RoomActions {
       return { ok: false, message: authCheck.reason };
     }
 
-    if (targetId === actor.id) {
-      return { ok: false, message: 'You cannot give access to yourself.' };
-    }
-
     const channel = guild.channels.cache.get(authCheck.roomChannelId!);
     if (!channel || channel.type !== 2) {
       return { ok: false, message: 'Voice channel not found.' };
@@ -235,7 +231,10 @@ export class RoomActions {
       await this.lifecycleService.giveAccessMember(channel as any, targetId);
       return {
         ok: true,
-        message: `🔑 Gave <@${targetId}> access to the room.`,
+        message:
+          targetId === actor.id
+            ? '🔑 You now have access to the room.'
+            : `🔑 Gave <@${targetId}> access to the room.`,
       };
     } catch (error) {
       logger.error('Failed to give access to member', error);
