@@ -3,15 +3,23 @@ import {
   UserSelectMenuInteraction,
   StringSelectMenuInteraction,
   UserContextMenuCommandInteraction,
+  ChatInputCommandInteraction,
   GuildMember,
   ActionRowBuilder,
   UserSelectMenuBuilder,
   StringSelectMenuBuilder,
+  ChannelType,
 } from 'discord.js';
 import { RoomLifecycleService } from '../services/RoomLifecycleService';
 import { RoomActions } from '../services/RoomActions';
 import { RoomControlAuth } from '../services/RoomControlAuth';
 import { logger } from '../core/Logger';
+import {
+  FALLBACK_VOICE_REGIONS,
+  buildRegionSelectMenu,
+  fetchSelectableVoiceRegions,
+  parseRtcRegionSelection,
+} from '../utils/voiceRegions';
 
 const USER_LIMIT_MIN = 2;
 const USER_LIMIT_MAX = 12;
@@ -37,6 +45,56 @@ function buildUserLimitSelectMenu(): StringSelectMenuBuilder {
     .setCustomId('rc:select:user-limit')
     .setPlaceholder('Select a user limit')
     .addOptions(options);
+}
+
+export async function replyWithLocationSelect(
+  interaction: ButtonInteraction | ChatInputCommandInteraction,
+  requireUiEnabled = false,
+): Promise<void> {
+  if (!interaction.guild || !(interaction.member instanceof GuildMember)) {
+    await interaction.reply({
+      content: 'This command can only be used in a server.',
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const auth = new RoomControlAuth();
+  const authCheck = auth.checkOwnerInRoom(interaction.member, requireUiEnabled);
+  if (!authCheck.ok) {
+    await interaction.reply({
+      content: authCheck.reason || 'Authorization failed.',
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const channel = interaction.guild.channels.cache.get(authCheck.roomChannelId!);
+  if (!channel || channel.type !== ChannelType.GuildVoice) {
+    await interaction.reply({
+      content: 'Voice channel not found.',
+      ephemeral: true,
+    });
+    return;
+  }
+
+  let regions;
+  try {
+    regions = await fetchSelectableVoiceRegions(interaction.client, channel.rtcRegion);
+  } catch (error) {
+    logger.warn('Failed to fetch Discord voice regions, using fallback list', error);
+    regions = FALLBACK_VOICE_REGIONS;
+  }
+
+  const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+    buildRegionSelectMenu(regions, channel.rtcRegion),
+  );
+
+  await interaction.reply({
+    content: 'Select the voice server location for your room:',
+    components: [row],
+    ephemeral: true,
+  });
 }
 
 export async function handleButtonInteraction(interaction: ButtonInteraction): Promise<void> {
@@ -87,6 +145,11 @@ export async function handleButtonInteraction(interaction: ButtonInteraction): P
           components: [row],
           ephemeral: true,
         });
+        break;
+      }
+
+      case 'location': {
+        await replyWithLocationSelect(interaction, true);
         break;
       }
 
@@ -271,14 +334,21 @@ export async function handleStringSelectInteraction(
   if (!interaction.guild || !(interaction.member instanceof GuildMember)) return;
 
   const action = interaction.customId.slice(10);
-  if (action !== 'user-limit') return;
-
-  const limit = parseInt(interaction.values[0], 10);
   const lifecycleService = new RoomLifecycleService(interaction.client);
   const roomActions = new RoomActions(lifecycleService);
 
   try {
-    const result = await roomActions.runSetUserLimit(interaction.member, interaction.guild, limit);
+    let result;
+
+    if (action === 'user-limit') {
+      const limit = parseInt(interaction.values[0], 10);
+      result = await roomActions.runSetUserLimit(interaction.member, interaction.guild, limit);
+    } else if (action === 'location') {
+      const rtcRegion = parseRtcRegionSelection(interaction.values[0]);
+      result = await roomActions.runSetRtcRegion(interaction.member, interaction.guild, rtcRegion);
+    } else {
+      result = { ok: false, message: 'Unknown action.' };
+    }
 
     await interaction.update({
       content: result.message || 'An error occurred.',

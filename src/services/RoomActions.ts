@@ -1,9 +1,14 @@
-import { Guild, GuildMember, EmbedBuilder } from 'discord.js';
+import { Guild, GuildMember, EmbedBuilder, ChannelType } from 'discord.js';
 import { RoomLifecycleService } from './RoomLifecycleService';
 import { RoomControlAuth } from './RoomControlAuth';
 import { roomStore } from '../state/RoomStore';
 import { configStore } from '../state/ConfigStore';
 import { logger } from '../core/Logger';
+import {
+  FALLBACK_VOICE_REGIONS,
+  fetchSelectableVoiceRegions,
+  rtcRegionDisplayName,
+} from '../utils/voiceRegions';
 
 export interface ActionResult {
   ok: boolean;
@@ -280,6 +285,43 @@ export class RoomActions {
     }
   }
 
+  async runSetRtcRegion(
+    actor: GuildMember,
+    guild: Guild,
+    rtcRegion: string | null,
+  ): Promise<ActionResult> {
+    const authCheck = this.auth.checkOwnerInRoom(actor);
+    if (!authCheck.ok) {
+      return { ok: false, message: authCheck.reason };
+    }
+
+    const channel = guild.channels.cache.get(authCheck.roomChannelId!);
+    if (!channel || channel.type !== ChannelType.GuildVoice) {
+      return { ok: false, message: 'Voice channel not found.' };
+    }
+
+    const currentRegion = channel.rtcRegion ?? null;
+    const regions = await fetchSelectableVoiceRegions(actor.client, currentRegion).catch(
+      () => FALLBACK_VOICE_REGIONS,
+    );
+    const label = rtcRegionDisplayName(rtcRegion, regions);
+
+    if (currentRegion === rtcRegion) {
+      return { ok: false, message: `Server location is already set to ${label}.` };
+    }
+
+    try {
+      await this.lifecycleService.setRtcRegion(authCheck.roomChannelId!, guild, rtcRegion);
+      return {
+        ok: true,
+        message: `🌍 Server location set to **${label}**.`,
+      };
+    } catch (error) {
+      logger.error('Failed to set server location', error);
+      return { ok: false, message: 'Failed to set server location. Please try again.' };
+    }
+  }
+
   async runSetUserLimit(actor: GuildMember, guild: Guild, limit: number): Promise<ActionResult> {
     const authCheck = this.auth.checkOwnerInRoom(actor);
     if (!authCheck.ok) {
@@ -331,11 +373,16 @@ export class RoomActions {
     }
 
     const channel = guild.channels.cache.get(authCheck.roomChannelId!);
-    if (!channel || channel.type !== 2) {
+    if (!channel || channel.type !== ChannelType.GuildVoice) {
       return { ok: false, message: 'Voice channel not found.' };
     }
 
-    const embed = this.lifecycleService.getRoomStatus(channel as any, room);
+    const regions = await fetchSelectableVoiceRegions(actor.client, channel.rtcRegion).catch(
+      () => FALLBACK_VOICE_REGIONS,
+    );
+    const embed = this.lifecycleService.getRoomStatus(channel, room, {
+      serverLocation: rtcRegionDisplayName(channel.rtcRegion, regions),
+    });
     return { ok: true, embed };
   }
 }

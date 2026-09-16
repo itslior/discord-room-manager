@@ -207,6 +207,21 @@ export class RoomLifecycleService {
     }
   }
 
+  async setRtcRegion(channelId: string, guild: Guild, rtcRegion: string | null): Promise<void> {
+    try {
+      const channel = guild.channels.cache.get(channelId);
+      if (!channel || channel.type !== ChannelType.GuildVoice) return;
+
+      await channel.setRTCRegion(rtcRegion);
+      logger.info(
+        `Set RTC region to ${rtcRegion ?? 'automatic'} for ${channel.name} (${channelId})`,
+      );
+    } catch (error) {
+      logger.error(`Failed to set RTC region for room ${channelId}`, error);
+      throw error;
+    }
+  }
+
   async unlockRoom(channelId: string, guild: Guild, hub: VcHub): Promise<void> {
     try {
       const channel = guild.channels.cache.get(channelId);
@@ -306,7 +321,11 @@ export class RoomLifecycleService {
     logger.info(`Gave access to user ${userId} for channel ${channel.name}`);
   }
 
-  getRoomStatus(channel: VoiceChannel, room: ManagedRoom): EmbedBuilder {
+  getRoomStatus(
+    channel: VoiceChannel,
+    room: ManagedRoom,
+    extras?: { serverLocation?: string },
+  ): EmbedBuilder {
     const embed = new EmbedBuilder()
       .setTitle(`Room Status: ${channel.name}`)
       .setColor(room.locked ? 0xff0000 : 0x00ff00)
@@ -317,6 +336,11 @@ export class RoomLifecycleService {
         {
           name: 'User Limit',
           value: channel.userLimit === 0 ? 'Unlimited' : `${channel.userLimit}`,
+          inline: true,
+        },
+        {
+          name: 'Server Location',
+          value: extras?.serverLocation ?? (channel.rtcRegion || 'Automatic'),
           inline: true,
         },
       );

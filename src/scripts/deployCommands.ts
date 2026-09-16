@@ -7,6 +7,7 @@ import { lockCommand } from '../commands/Lock';
 import { unlockCommand } from '../commands/Unlock';
 import { takeOwnershipCommand } from '../commands/TakeOwnership';
 import { transferCommand } from '../commands/Transfer';
+import { locationCommand } from '../commands/Location';
 import { setRoomControlUiCommand } from '../commands/SetRoomControlUi';
 
 const commands = [
@@ -15,6 +16,7 @@ const commands = [
   unlockCommand,
   takeOwnershipCommand,
   transferCommand,
+  locationCommand,
   setRoomControlUiCommand,
 ].map((cmd) => cmd.data.toJSON());
 

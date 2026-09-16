@@ -44,6 +44,7 @@ export class Bot {
 
         const { RoomControlCommandService } = await import('../services/RoomControlCommandService');
         const contextMenuService = new RoomControlCommandService();
+        const { buildRoomControlPanel } = await import('../services/RoomControlPanel');
         
         for (const config of configStore.getAll()) {
           if (config.roomControlUi?.enabled) {
@@ -52,6 +53,19 @@ export class Bot {
               logger.info(`Registered context menus for guild ${config.guildId} on startup`);
             } catch (error) {
               logger.error(`Failed to register context menus for guild ${config.guildId} on startup`, error);
+            }
+
+            if (config.roomControlUi.panelMessageId && config.roomControlUi.panelChannelId) {
+              try {
+                const channel = await this.client.channels.fetch(config.roomControlUi.panelChannelId);
+                if (channel?.isTextBased()) {
+                  const panelMessage = await channel.messages.fetch(config.roomControlUi.panelMessageId);
+                  await panelMessage.edit(buildRoomControlPanel());
+                  logger.info(`Refreshed room control panel for guild ${config.guildId} on startup`);
+                }
+              } catch (error) {
+                logger.warn(`Could not refresh room control panel for guild ${config.guildId}`, error);
+              }
             }
           }
         }
