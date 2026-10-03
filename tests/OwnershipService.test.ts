@@ -20,6 +20,7 @@ describe('OwnershipService', () => {
         ownerUserId: 'user1',
         createdAt: Date.now(),
         locked: false,
+        hubId: 'main-lobby',
       };
 
       (roomStore.get as jest.Mock).mockReturnValue(room);
@@ -34,6 +35,7 @@ describe('OwnershipService', () => {
         ownerUserId: 'user1',
         createdAt: Date.now(),
         locked: false,
+        hubId: 'main-lobby',
       };
 
       (roomStore.get as jest.Mock).mockReturnValue(room);
@@ -56,6 +58,7 @@ describe('OwnershipService', () => {
         ownerUserId: 'user1',
         createdAt: Date.now(),
         locked: false,
+        hubId: 'main-lobby',
       };
 
       (roomStore.get as jest.Mock).mockReturnValue(room);
