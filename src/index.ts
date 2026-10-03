@@ -9,6 +9,7 @@ import { unlockCommand } from './commands/Unlock';
 import { takeOwnershipCommand } from './commands/TakeOwnership';
 import { transferCommand } from './commands/Transfer';
 import { locationCommand } from './commands/Location';
+import { roomInfoCommand } from './commands/RoomInfo';
 import { setRoomControlUiCommand } from './commands/SetRoomControlUi';
 
 async function main() {
@@ -22,6 +23,7 @@ async function main() {
   bot.registerCommand(takeOwnershipCommand);
   bot.registerCommand(transferCommand);
   bot.registerCommand(locationCommand);
+  bot.registerCommand(roomInfoCommand);
   bot.registerCommand(setRoomControlUiCommand);
 
   registerVoiceStateUpdate(bot.client);

@@ -91,11 +91,23 @@ export class ReconciliationService {
   }
 
   private findManagedChannels(guild: Guild, prefixes: string[]): VoiceChannel[] {
-    const patterns = prefixes.map(prefix => {
+    const patterns: RegExp[] = [];
+    
+    // New owner-based patterns: "Alice's room" and "Alice's room 2"
+    for (const prefix of prefixes) {
+      const base = prefix ? `${prefix} .+'s room` : `.+'s room`;
+      const escaped = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\\\.\\+/g, '.+');
+      patterns.push(new RegExp(`^${escaped}$`));
+      patterns.push(new RegExp(`^${escaped} \\d+$`));
+    }
+    
+    // Legacy patterns: "Voice 1", "General Voice 2"
+    for (const prefix of prefixes) {
       const basePattern = prefix ? `${prefix} Voice` : 'Voice';
       const escaped = basePattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      return new RegExp(`^${escaped} \\d+$`);
-    });
+      patterns.push(new RegExp(`^${escaped} \\d+$`));
+    }
+    
     const managedChannels: VoiceChannel[] = [];
 
     for (const channel of guild.channels.cache.values()) {

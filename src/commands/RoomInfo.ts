@@ -5,14 +5,14 @@ import {
 } from 'discord.js';
 import { Command } from './types';
 import { CommandScopeService } from '../services/CommandScopeService';
-import { replyWithLocationSelect } from '../interactions/roomControlInteractions';
+import { replyWithRoomInfoSelect } from '../interactions/roomControlInteractions';
 
 const scopeService = new CommandScopeService();
 
-export const locationCommand: Command = {
+export const roomInfoCommand: Command = {
   data: new SlashCommandBuilder()
-    .setName('change-server')
-    .setDescription('Change your room\'s voice server'),
+    .setName('room-info')
+    .setDescription('See who owns a managed room'),
 
   async execute(interaction: ChatInputCommandInteraction) {
     if (!interaction.guildId || !interaction.guild || !(interaction.member instanceof GuildMember)) {
@@ -26,6 +26,6 @@ export const locationCommand: Command = {
       return;
     }
 
-    await replyWithLocationSelect(interaction);
+    await replyWithRoomInfoSelect(interaction);
   },
 };

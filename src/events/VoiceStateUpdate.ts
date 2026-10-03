@@ -4,6 +4,7 @@ import { configStore } from '../state/ConfigStore';
 import { roomStore } from '../state/RoomStore';
 import { RoomLifecycleService } from '../services/RoomLifecycleService';
 import { ChannelNameAllocator } from '../services/ChannelNameAllocator';
+import { sanitizeOwnerName } from '../utils/ownerRoomName';
 import { GuildConfig, VcHub } from '../types/domain';
 
 export function registerVoiceStateUpdate(client: Client): void {
@@ -50,7 +51,8 @@ async function handleLobbyJoin(
     return;
   }
 
-  const channelName = await allocator.allocate(guild, hub.namePrefix);
+  const ownerName = sanitizeOwnerName(member);
+  const channelName = await allocator.allocate(guild, hub.namePrefix, ownerName);
   
   const room = await lifecycleService.createRoom(
     guild,

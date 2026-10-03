@@ -1,18 +1,18 @@
 import { Guild, ChannelType } from 'discord.js';
 import { logger } from '../core/Logger';
 import { removeLockedPrefix } from '../utils/roomChannelName';
+import { buildOwnerRoomName, parseOwnerRoomIndex } from '../utils/ownerRoomName';
 
 export class ChannelNameAllocator {
-  async allocate(guild: Guild, prefix: string = ''): Promise<string> {
-    const nameBase = prefix ? `${prefix} Voice` : 'Voice';
-    const pattern = new RegExp(`^${this.escapeRegex(nameBase)} (\\d+)$`);
+  async allocate(guild: Guild, prefix: string = '', ownerName: string): Promise<string> {
     const existingIndices = new Set<number>();
 
     guild.channels.cache.forEach((channel) => {
       if (channel.type === ChannelType.GuildVoice) {
-        const match = removeLockedPrefix(channel.name).match(pattern);
-        if (match) {
-          existingIndices.add(parseInt(match[1], 10));
+        const unlocked = removeLockedPrefix(channel.name);
+        const index = parseOwnerRoomIndex(unlocked, prefix, ownerName);
+        if (index !== null) {
+          existingIndices.add(index);
         }
       }
     });
@@ -22,13 +22,9 @@ export class ChannelNameAllocator {
       index++;
     }
 
-    const channelName = `${nameBase} ${index}`;
-    logger.debug(`Allocated channel name: ${channelName}`);
+    const channelName = buildOwnerRoomName(prefix, ownerName, index);
+    logger.debug(`Allocated channel name: ${channelName} for owner ${ownerName}`);
     return channelName;
-  }
-
-  private escapeRegex(str: string): string {
-    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
   findLowestFreeIndex(existingIndices: number[]): number {

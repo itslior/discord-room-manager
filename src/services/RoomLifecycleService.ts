@@ -10,8 +10,10 @@ import {
 } from 'discord.js';
 import { ManagedRoom, VcHub } from '../types/domain';
 import { roomStore } from '../state/RoomStore';
+import { configStore } from '../state/ConfigStore';
 import { logger } from '../core/Logger';
 import { addLockedPrefix, hasLockedPrefix, removeLockedPrefix } from '../utils/roomChannelName';
+import { sanitizeOwnerName, buildOwnerRoomName, parseOwnerRoomIndex } from '../utils/ownerRoomName';
 export class RoomLifecycleService {
   constructor(private client: Client) {}
 
@@ -262,6 +264,9 @@ export class RoomLifecycleService {
     }
 
     const room = roomStore.get(channelId);
+    if (!room) {
+      return { ok: false, warning: 'Room not found in store.' };
+    }
 
     try {
       await channel.permissionOverwrites.delete(oldOwnerId, 'Ownership transferred - cleanup');
@@ -271,8 +276,47 @@ export class RoomLifecycleService {
 
     await roomStore.update(channelId, { ownerUserId: newOwnerId });
 
-    if (room?.locked) {
+    if (room.locked) {
       await this.giveAccessMember(channel, newOwnerId);
+    }
+
+    // Rename channel for new owner
+    const config = configStore.get(guild.id);
+    if (config) {
+      const hub = config.vcHubs.find(h => h.id === room.hubId);
+      if (hub) {
+        try {
+          const newOwnerName = sanitizeOwnerName(newOwner);
+          const existingIndices = new Set<number>();
+          
+          // Scan existing rooms for this owner (excluding the channel being renamed)
+          guild.channels.cache.forEach((ch) => {
+            if (ch.type === ChannelType.GuildVoice && ch.id !== channelId) {
+              const unlocked = removeLockedPrefix(ch.name);
+              const index = parseOwnerRoomIndex(unlocked, hub.namePrefix, newOwnerName);
+              if (index !== null) {
+                existingIndices.add(index);
+              }
+            }
+          });
+
+          // Find lowest free index
+          let index = 1;
+          while (existingIndices.has(index)) {
+            index++;
+          }
+
+          let newName = buildOwnerRoomName(hub.namePrefix, newOwnerName, index);
+          if (room.locked) {
+            newName = addLockedPrefix(newName);
+          }
+
+          await channel.setName(newName);
+          logger.info(`Renamed room from ${channel.name} to ${newName} for new owner ${newOwnerId}`);
+        } catch (error) {
+          logger.warn(`Could not rename room on ownership transfer: ${error}. Transfer completed anyway.`);
+        }
+      }
     }
 
     logger.info(`Transferred ownership of ${channel.name} from ${oldOwnerId} to ${newOwnerId}`);

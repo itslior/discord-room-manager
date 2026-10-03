@@ -11,18 +11,19 @@ export function buildRoomControlPanel(): Pick<MessageCreateOptions & MessageEdit
   const embed = new EmbedBuilder()
     .setTitle('Room Controls')
     .setDescription(
-      'Click a button while in your voice room. Only you see the result.\n\n' +
+      'Manage your voice room. Owner-only controls require you to be in your room.\n\n' +
       '**Lock** - prevent others from joining\n' +
       '**Unlock** - allow others to join\n' +
       '**User Limit** - set max people (unlimited or 2-12)\n' +
-      '**Location** - change voice server region\n' +
+      '**Change Server** - change voice server region\n' +
       '**Kick** - remove someone temporarily\n' +
       '**Ban** - block someone from joining\n' +
       '**Unban** - remove block\n' +
       '**Claim** - take ownership of empty room\n' +
       '**Pass Ownership** - transfer to another user\n' +
       '**Give Access** - allow specific user to join\n' +
-      '**Status** - view room info'
+      '**Status** - view room info\n' +
+      '**Room Info** - see who owns a managed room'
     )
     .setColor(0x5865f2);
 
@@ -85,8 +86,13 @@ export function buildRoomControlPanel(): Pick<MessageCreateOptions & MessageEdit
   const row3 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId('rc:location')
-      .setLabel('Location')
+      .setLabel('Change Server')
       .setEmoji('🌍')
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId('rc:room-info')
+      .setLabel('Room Info')
+      .setEmoji('📋')
       .setStyle(ButtonStyle.Secondary)
   );
 

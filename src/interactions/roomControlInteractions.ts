@@ -9,10 +9,12 @@ import {
   UserSelectMenuBuilder,
   StringSelectMenuBuilder,
   ChannelType,
+  EmbedBuilder,
 } from 'discord.js';
 import { RoomLifecycleService } from '../services/RoomLifecycleService';
 import { RoomActions } from '../services/RoomActions';
 import { RoomControlAuth } from '../services/RoomControlAuth';
+import { roomStore } from '../state/RoomStore';
 import { logger } from '../core/Logger';
 import {
   FALLBACK_VOICE_REGIONS,
@@ -45,6 +47,71 @@ function buildUserLimitSelectMenu(): StringSelectMenuBuilder {
     .setCustomId('rc:select:user-limit')
     .setPlaceholder('Select a user limit')
     .addOptions(options);
+}
+
+export async function replyWithRoomInfoSelect(
+  interaction: ButtonInteraction | ChatInputCommandInteraction,
+): Promise<void> {
+  if (!interaction.guild) {
+    await interaction.reply({
+      content: 'This command can only be used in a server.',
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const rooms = roomStore.getByGuild(interaction.guild.id);
+  
+  if (rooms.length === 0) {
+    await interaction.reply({
+      content: 'No active managed rooms in this server.',
+      ephemeral: true,
+    });
+    return;
+  }
+
+  // Sort: occupied first, then by newest
+  const sortedRooms = rooms
+    .map(room => {
+      const channel = interaction.guild!.channels.cache.get(room.channelId);
+      const memberCount = channel?.type === ChannelType.GuildVoice ? channel.members.size : 0;
+      return { room, channel, memberCount };
+    })
+    .filter(item => item.channel) // Only include rooms with valid channels
+    .sort((a, b) => {
+      if (a.memberCount !== b.memberCount) {
+        return b.memberCount - a.memberCount; // Occupied first
+      }
+      return b.room.createdAt - a.room.createdAt; // Newest first
+    });
+
+  if (sortedRooms.length === 0) {
+    await interaction.reply({
+      content: 'No active managed rooms in this server.',
+      ephemeral: true,
+    });
+    return;
+  }
+
+  // Limit to 25 options (Discord limit)
+  const options = sortedRooms.slice(0, 25).map(({ room, channel, memberCount }) => ({
+    label: channel!.name.slice(0, 100),
+    value: room.channelId,
+    description: memberCount > 0 ? `${memberCount} member${memberCount === 1 ? '' : 's'}` : 'Empty',
+  }));
+
+  const selectMenu = new StringSelectMenuBuilder()
+    .setCustomId('rc:select:room-info')
+    .setPlaceholder('Select a room to view info')
+    .addOptions(options);
+
+  const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
+
+  await interaction.reply({
+    content: 'Select a room to see its owner:',
+    components: [row],
+    ephemeral: true,
+  });
 }
 
 export async function replyWithLocationSelect(
@@ -91,7 +158,7 @@ export async function replyWithLocationSelect(
   );
 
   await interaction.reply({
-    content: 'Select the voice server location for your room:',
+    content: 'Select the voice server for your room:',
     components: [row],
     ephemeral: true,
   });
@@ -175,6 +242,11 @@ export async function handleButtonInteraction(interaction: ButtonInteraction): P
             ephemeral: true,
           });
         }
+        break;
+      }
+
+      case 'room-info': {
+        await replyWithRoomInfoSelect(interaction);
         break;
       }
 
@@ -338,22 +410,61 @@ export async function handleStringSelectInteraction(
   const roomActions = new RoomActions(lifecycleService);
 
   try {
-    let result;
-
     if (action === 'user-limit') {
       const limit = parseInt(interaction.values[0], 10);
-      result = await roomActions.runSetUserLimit(interaction.member, interaction.guild, limit);
+      const result = await roomActions.runSetUserLimit(interaction.member, interaction.guild, limit);
+      await interaction.update({
+        content: result.message || 'An error occurred.',
+        components: [],
+      });
     } else if (action === 'location') {
       const rtcRegion = parseRtcRegionSelection(interaction.values[0]);
-      result = await roomActions.runSetRtcRegion(interaction.member, interaction.guild, rtcRegion);
+      const result = await roomActions.runSetRtcRegion(interaction.member, interaction.guild, rtcRegion);
+      await interaction.update({
+        content: result.message || 'An error occurred.',
+        components: [],
+      });
+    } else if (action === 'room-info') {
+      const channelId = interaction.values[0];
+      const room = roomStore.get(channelId);
+      
+      if (!room) {
+        await interaction.update({
+          content: 'Room not found.',
+          components: [],
+        });
+        return;
+      }
+      
+      const channel = interaction.guild.channels.cache.get(channelId);
+      if (!channel || channel.type !== ChannelType.GuildVoice) {
+        await interaction.update({
+          content: 'Channel not found.',
+          components: [],
+        });
+        return;
+      }
+      
+      const embed = new EmbedBuilder()
+        .setTitle(`Room Info: ${channel.name}`)
+        .setColor(0x5865f2)
+        .addFields(
+          { name: 'Owner', value: `<@${room.ownerUserId}>`, inline: true },
+          { name: 'Locked', value: room.locked ? 'Yes' : 'No', inline: true },
+          { name: 'Members', value: `${channel.members.size}`, inline: true },
+        );
+      
+      await interaction.update({
+        content: '',
+        embeds: [embed],
+        components: [],
+      });
     } else {
-      result = { ok: false, message: 'Unknown action.' };
+      await interaction.update({
+        content: 'Unknown action.',
+        components: [],
+      });
     }
-
-    await interaction.update({
-      content: result.message || 'An error occurred.',
-      components: [],
-    });
   } catch (error) {
     logger.error('Error handling string select interaction', error);
     await interaction.update({
