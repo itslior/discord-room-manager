@@ -93,9 +93,9 @@ export class ReconciliationService {
   private findManagedChannels(guild: Guild, prefixes: string[]): VoiceChannel[] {
     const patterns: RegExp[] = [];
     
-    // New owner-based patterns: "Alice's room" and "Alice's room 2"
+    // New owner-based patterns: "Alice", "Alice 2", "Diamond Bob", "Diamond Bob 3"
     for (const prefix of prefixes) {
-      const base = prefix ? `${prefix} .+'s room` : `.+'s room`;
+      const base = prefix ? `${prefix} .+` : `.+`;
       const escaped = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\\\.\\+/g, '.+');
       patterns.push(new RegExp(`^${escaped}$`));
       patterns.push(new RegExp(`^${escaped} \\d+$`));
