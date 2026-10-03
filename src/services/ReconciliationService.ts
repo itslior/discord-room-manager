@@ -93,10 +93,12 @@ export class ReconciliationService {
   private findManagedChannels(guild: Guild, prefixes: string[]): VoiceChannel[] {
     const patterns: RegExp[] = [];
     
-    // New owner-based patterns: "Alice", "Alice 2", "Diamond Bob", "Diamond Bob 3"
+    // New owner-based patterns: "Alice's Room", "Alice's Room 2", "Diamond Bob's Room", "Diamond Bob's Room 3"
     for (const prefix of prefixes) {
-      const base = prefix ? `${prefix} .+` : `.+`;
-      const escaped = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\\\.\\+/g, '.+');
+      const ownerPattern = '.+';
+      const base = prefix ? `${prefix} ${ownerPattern}'s Room` : `${ownerPattern}'s Room`;
+      // Escape everything except .+ which we want as a wildcard
+      const escaped = base.replace(/[*?^${}()|[\]\\]/g, '\\$&');
       patterns.push(new RegExp(`^${escaped}$`));
       patterns.push(new RegExp(`^${escaped} \\d+$`));
     }

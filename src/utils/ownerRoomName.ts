@@ -22,10 +22,10 @@ export function sanitizeOwnerName(member: GuildMember): string {
  * Index 1 produces an unnumbered name; 2+ appends the number.
  * 
  * Examples:
- * - buildOwnerRoomName('', 'Alice', 1) => "Alice"
- * - buildOwnerRoomName('', 'Alice', 2) => "Alice 2"
- * - buildOwnerRoomName('General', 'Bob', 1) => "General Bob"
- * - buildOwnerRoomName('General', 'Bob', 3) => "General Bob 3"
+ * - buildOwnerRoomName('', 'Alice', 1) => "Alice's Room"
+ * - buildOwnerRoomName('', 'Alice', 2) => "Alice's Room 2"
+ * - buildOwnerRoomName('General', 'Bob', 1) => "General Bob's Room"
+ * - buildOwnerRoomName('General', 'Bob', 3) => "General Bob's Room 3"
  */
 export function buildOwnerRoomName(prefix: string, ownerName: string, index: number): string {
   // Reserve space for [LOCKED] prefix
@@ -33,10 +33,11 @@ export function buildOwnerRoomName(prefix: string, ownerName: string, index: num
   
   // Build the name parts
   const prefixPart = prefix ? `${prefix} ` : '';
+  const suffix = "'s Room";
   const indexPart = index === 1 ? '' : ` ${index}`;
   
   // Calculate how much space we have for the owner name
-  const fixedLength = prefixPart.length + indexPart.length;
+  const fixedLength = prefixPart.length + suffix.length + indexPart.length;
   const maxOwnerLength = maxLength - fixedLength;
   
   // Truncate owner name if needed
@@ -44,18 +45,18 @@ export function buildOwnerRoomName(prefix: string, ownerName: string, index: num
     ? ownerName.slice(0, maxOwnerLength).trim() 
     : ownerName;
   
-  return `${prefixPart}${truncatedOwner}${indexPart}`;
+  return `${prefixPart}${truncatedOwner}${suffix}${indexPart}`;
 }
 
 /**
  * Build regex patterns to match rooms owned by this owner.
  * Returns [unnumberedPattern, numberedPattern].
  * 
- * The unnumbered pattern matches "Alice" or "General Alice".
- * The numbered pattern matches "Alice 2" or "General Alice 3".
+ * The unnumbered pattern matches "Alice's Room" or "General Alice's Room".
+ * The numbered pattern matches "Alice's Room 2" or "General Alice's Room 3".
  */
 export function buildOwnerRoomPatterns(prefix: string, ownerName: string): [RegExp, RegExp] {
-  const base = prefix ? `${prefix} ${ownerName}` : ownerName;
+  const base = prefix ? `${prefix} ${ownerName}'s Room` : `${ownerName}'s Room`;
   const escapedBase = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   
   const unnumberedPattern = new RegExp(`^${escapedBase}$`);
